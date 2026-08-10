@@ -79,9 +79,11 @@ async function generateTopBoardImage(sortedGroups) {
     const canvas = createCanvas(1200, 675);
     const ctx = canvas.getContext('2d');
 
+    // الخلفية العامة
     ctx.fillStyle = '#0b0f19';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // عنوان اللوحة العلوي
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 36px sans-serif';
     ctx.fillText('MYTH', 120, 75);
@@ -118,6 +120,7 @@ async function generateTopBoardImage(sortedGroups) {
     let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     drawStatBox(885, 45, 150, 70, 'UPDATED', dateStr);
 
+    // --- صندوق المركز الأول (Champion Box) ---
     ctx.fillStyle = 'rgba(255, 180, 100, 0.05)';
     ctx.strokeStyle = 'rgba(255, 180, 100, 0.4)';
     ctx.lineWidth = 2;
@@ -136,6 +139,7 @@ async function generateTopBoardImage(sortedGroups) {
 
     let topGroup = sortedGroups[0];
     if (topGroup) {
+        // رسم أفتار الليدر للمركز الأول
         ctx.save();
         ctx.beginPath();
         ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
@@ -156,13 +160,15 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
         ctx.stroke();
 
+        // اسم القروب الحقيقي بدلاً من كلمة GROUP
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 32px sans-serif';
-        ctx.fillText(topGroup.name || 'GROUP', 200, 280);
+        ctx.fillText(topGroup.name || 'GROUP', 200, 270);
 
+        // اسم الليدر الحقيقي بدلاً من كلمة user
         ctx.fillStyle = '#8b9bb4';
         ctx.font = '14px sans-serif';
-        ctx.fillText(`Leader • ${topGroup.leaderName || 'user'}`, 200, 315);
+        ctx.fillText(`Leader • ${topGroup.leaderName || 'user'}`, 200, 310);
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.beginPath();
@@ -200,13 +206,14 @@ async function generateTopBoardImage(sortedGroups) {
     } else {
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 32px sans-serif';
-        ctx.fillText('GROUP', 200, 280);
+        ctx.fillText('NO GROUP', 200, 280);
 
         ctx.fillStyle = '#8b9bb4';
         ctx.font = '14px sans-serif';
-        ctx.fillText('Leader • user', 200, 315);
+        ctx.fillText('Leader • none', 200, 315);
     }
 
+    // --- المراكز من 2 إلى 7 ---
     let cardPositions = [
         { x: 480, y: 150 },
         { x: 840, y: 150 },
@@ -234,6 +241,7 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.fillText(`#${i + 1}`, pos.x + 20, pos.y + 28);
 
         if (g) {
+            // رسم أفتار الليدر للمراكز الباقية
             ctx.save();
             ctx.beginPath();
             ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
@@ -254,13 +262,15 @@ async function generateTopBoardImage(sortedGroups) {
             ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
             ctx.stroke();
 
+            // اسم القروب الحقيقي
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px sans-serif';
-            ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 55);
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 50);
 
+            // اسم الليدر الحقيقي
             ctx.fillStyle = '#8b9bb4';
             ctx.font = '12px sans-serif';
-            ctx.fillText(`Leader • ${g.leaderName || 'user'}`, pos.x + 85, pos.y + 78);
+            ctx.fillText(`Leader • ${g.leaderName || 'user'}`, pos.x + 85, pos.y + 75);
 
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 16px sans-serif';
@@ -274,11 +284,11 @@ async function generateTopBoardImage(sortedGroups) {
         } else {
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px sans-serif';
-            ctx.fillText('GROUP', pos.x + 85, pos.y + 55);
+            ctx.fillText('---', pos.x + 85, pos.y + 55);
 
             ctx.fillStyle = '#8b9bb4';
             ctx.font = '12px sans-serif';
-            ctx.fillText('Leader • user', pos.x + 85, pos.y + 78);
+            ctx.fillText('Leader • ---', pos.x + 85, pos.y + 78);
 
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 16px sans-serif';
@@ -491,6 +501,7 @@ client.on('messageCreate', async (message) => {
                         ]
                     });
 
+                    // حفظ بيانات القروب بالأسماء والأفاتار الحقيقية بدقة
                     db.groups[groupKey] = {
                         name: groupName,
                         roleId: groupRole.id,
@@ -542,7 +553,6 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isStringSelectMenu()) return;
     if (interaction.customId !== 'leader_select_menu') return;
 
-    // استجابة فورية لمنع خطأ الـ 3 ثواني
     await interaction.deferUpdate().catch(() => {});
 
     const guild = interaction.guild;
