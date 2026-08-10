@@ -43,22 +43,27 @@ let db = { groups: {} };
 
 function loadDb() {
     if (fs.existsSync(DB_FILE)) {
-        try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { db = { groups: {} }; }
+        try { 
+            const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+            if (data.groups) {
+                db.groups = data.groups;
+            } else {
+                db.groups = data;
+            }
+        } catch (e) { db = { groups: {} }; }
     }
 }
 function saveDb() {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 4));
+    fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4));
 }
 
 async function generateTopBoardImage(sortedGroups) {
     const canvas = createCanvas(1200, 675);
     const ctx = canvas.getContext('2d');
 
-    // خلفية لوحة الترتيب الاحترافية
     ctx.fillStyle = '#0b0f19';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // عنوان اللوحة والإحصائيات العامة
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 36px sans-serif';
     ctx.fillText('MYTH', 120, 75);
@@ -69,7 +74,6 @@ async function generateTopBoardImage(sortedGroups) {
 
     let totalXpAll = sortedGroups.reduce((acc, g) => acc + (g.xp || 0), 0);
 
-    // مربعات الإحصائيات العلوية
     function drawStatBox(x, y, w, h, title, val) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
@@ -95,7 +99,6 @@ async function generateTopBoardImage(sortedGroups) {
     let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     drawStatBox(885, 45, 150, 70, 'UPDATED', dateStr);
 
-    // المركز الأول (#1)
     ctx.fillStyle = 'rgba(255, 180, 100, 0.05)';
     ctx.strokeStyle = 'rgba(255, 180, 100, 0.4)';
     ctx.lineWidth = 2;
@@ -114,7 +117,6 @@ async function generateTopBoardImage(sortedGroups) {
 
     let topGroup = sortedGroups[0];
     if (topGroup) {
-        // رسم صورة الليدر أو القروب دائرية
         ctx.save();
         ctx.beginPath();
         ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
@@ -129,14 +131,12 @@ async function generateTopBoardImage(sortedGroups) {
         }
         ctx.restore();
 
-        // إطار دائرى متوهج للمركز الأول
         ctx.strokeStyle = '#ffb464';
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
         ctx.stroke();
 
-        // اسم القروب واسم الليدر
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 32px sans-serif';
         ctx.fillText(topGroup.name || 'USER', 200, 280);
@@ -145,7 +145,6 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.font = '14px sans-serif';
         ctx.fillText(`Leader • ${topGroup.leaderName || 'user'}`, 200, 315);
 
-        // إحصائيات المركز الأول
         ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.beginPath();
         ctx.roundRect(65, 375, 200, 65, 10);
@@ -165,7 +164,6 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.font = 'bold 24px sans-serif';
         ctx.fillText('0', 295, 430);
 
-        // شريط التقدم
         ctx.fillStyle = '#222';
         ctx.beginPath();
         ctx.roundRect(65, 495, 370, 8, 4);
@@ -182,7 +180,6 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.fillText('Defend the crown.', 320, 535);
     }
 
-    // المراكز من #2 إلى #7
     let cardPositions = [
         { x: 480, y: 150 },
         { x: 840, y: 150 },
@@ -210,7 +207,6 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.fillText(`#${i + 1}`, pos.x + 20, pos.y + 28);
 
         if (g) {
-            // صورة مصغرة دائرية
             ctx.save();
             ctx.beginPath();
             ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
@@ -277,8 +273,7 @@ async function updateTopGroupsBoard() {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
         if (!channel) return;
 
-        let groupsObj = db.groups.groups || db.groups;
-        let sortedGroups = Object.values(groupsObj).sort((a, b) => (b.xp || 0) - (a.xp || 0));
+        let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0));
 
         const buffer = await generateTopBoardImage(sortedGroups);
         const attachment = new AttachmentBuilder(buffer, { name: 'top-groups.png' });
@@ -315,13 +310,12 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ content: 'منشن ليدر القروب المراد حذفه.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         }
 
-        let groupsObj = db.groups.groups || db.groups;
-        let foundKey = Object.keys(groupsObj).find(k => groupsObj[k].leaderId === targetMember.id);
+        let foundKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === targetMember.id);
         if (!foundKey) {
             return message.channel.send({ content: 'هذا الشخص ليس لديه قروب.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         }
 
-        let myGroup = groupsObj[foundKey];
+        let myGroup = db.groups[foundKey];
         try {
             let guild = message.guild;
             let tChan = guild.channels.cache.get(myGroup.textChannelId);
@@ -332,7 +326,7 @@ client.on('messageCreate', async (message) => {
             if (role) await role.delete().catch(() => {});
         } catch (e) {}
 
-        delete groupsObj[foundKey];
+        delete db.groups[foundKey];
         saveDb();
         await message.channel.send({ content: 'تم حذف القروب بنجاح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         return;
@@ -394,8 +388,7 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send({ content: 'لم تقم بمنشن أي عضو صحيح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
-            let groupsObj = db.groups.groups || db.groups;
-            let existingGroupsCount = Object.values(groupsObj).filter(g => g.leaderId === targetOwner.id || (g.members && g.members.includes(targetOwner.id))).length;
+            let existingGroupsCount = Object.values(db.groups).filter(g => g.leaderId === targetOwner.id || (g.members && g.members.includes(targetOwner.id))).length;
             if (existingGroupsCount >= 2) {
                 return message.channel.send({ content: 'هذا الشخص معه جروبين لازم يحذفه عشان يقدر يدخل' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
@@ -458,7 +451,7 @@ client.on('messageCreate', async (message) => {
                         ]
                     });
 
-                    groupsObj[groupKey] = {
+                    db.groups[groupKey] = {
                         name: groupName,
                         roleId: groupRole.id,
                         leaderId: targetOwner.id,
@@ -483,13 +476,11 @@ client.on('messageCreate', async (message) => {
     }
 
     if (message.channel.type === ChannelType.GuildText) {
-        let groupsObj = db.groups.groups || db.groups;
-        let userGroupKey = Object.keys(groupsObj).find(k => groupsObj[k].leaderId === message.author.id || (groupsObj[k].members && groupsObj[k].members.includes(message.author.id)));
+        let userGroupKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === message.author.id || (db.groups[k].members && db.groups[k].members.includes(message.author.id)));
         
         if (userGroupKey) {
-            let userGroup = groupsObj[userGroupKey];
-            const earnedXp = 2;
-            userGroup.xp = (userGroup.xp || 0) + earnedXp;
+            let userGroup = db.groups[userGroupKey];
+            userGroup.xp = (userGroup.xp || 0) + 2;
             userGroup.textCount = (userGroup.textCount || 0) + 1;
             saveDb();
         }
@@ -504,9 +495,8 @@ client.on('interactionCreate', async (interaction) => {
     const member = interaction.member;
     const userId = member.id;
 
-    let groupsObj = db.groups.groups || db.groups;
-    let myGroupKey = Object.keys(groupsObj).find(k => groupsObj[k].leaderId === userId || (groupsObj[k].members && groupsObj[k].members.includes(userId)));
-    let myGroup = myGroupKey ? groupsObj[myGroupKey] : null;
+    let myGroupKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === userId || (db.groups[k].members && db.groups[k].members.includes(userId)));
+    let myGroup = myGroupKey ? db.groups[myGroupKey] : null;
     let isLeader = myGroup && myGroup.leaderId === userId;
 
     const selectedValue = interaction.values[0];
@@ -658,7 +648,7 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             for (const [targetId, targetMember] of targetMembers) {
-                let existingGroupsCount = Object.values(groupsObj).filter(g => g.leaderId === targetId || (g.members && g.members.includes(targetId))).length;
+                let existingGroupsCount = Object.values(db.groups).filter(g => g.leaderId === targetId || (g.members && g.members.includes(targetId))).length;
                 if (existingGroupsCount >= 2) {
                     const failMsg = await interaction.followUp({ content: 'هذا الشخص داخل جروبين', ephemeral: true });
                     setTimeout(() => failMsg.delete().catch(() => {}), 5000);
@@ -760,7 +750,7 @@ client.on('interactionCreate', async (interaction) => {
                 if (role) await role.delete().catch(() => {});
             } catch (e) {}
 
-            delete groupsObj[myGroupKey];
+            delete db.groups[myGroupKey];
             saveDb();
             const replyMsg = await interaction.followUp({ content: 'تم حذف القروب بنجاح.', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
@@ -788,11 +778,9 @@ client.on('interactionCreate', async (interaction) => {
     const userId = interaction.user.id;
     const guild = interaction.guild;
 
-    let groupsObj = db.groups.groups || db.groups;
-
     if (customId.startsWith('accept_invite_')) {
         const gKey = customId.replace('accept_invite_', '');
-        const targetGroup = groupsObj[gKey];
+        const targetGroup = db.groups[gKey];
         if (targetGroup) {
             if (!targetGroup.members.includes(userId) && targetGroup.leaderId !== userId) {
                 targetGroup.members.push(userId);
