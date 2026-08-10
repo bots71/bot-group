@@ -54,7 +54,6 @@ function saveDb() {
     fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4));
 }
 
-// دالة ذكية للبحث عن قروب العضو سواء عبر الليدر أو امتلاك الرول يدوياً
 function getGroupsForUser(member) {
     if (!member) return [];
     return Object.keys(db.groups).filter(k => {
@@ -92,6 +91,7 @@ async function generateTopBoardImage(sortedGroups) {
     ctx.fillText('Performance board / activity • voice • events', 120, 105);
 
     let totalXpAll = sortedGroups.reduce((acc, g) => acc + (g.xp || 0), 0);
+    let totalGroupsCount = sortedGroups.length;
 
     function drawStatBox(x, y, w, h, title, val) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
@@ -111,13 +111,14 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.fillText(val, x + 20, y + 52);
     }
 
-    drawStatBox(520, 45, 95, 70, 'GROUPS', sortedGroups.length);
+    drawStatBox(520, 45, 95, 70, 'GROUPS', totalGroupsCount.toString());
     drawStatBox(630, 45, 120, 70, 'TOTAL XP', totalXpAll.toLocaleString());
     drawStatBox(765, 45, 105, 70, 'EVENT WINS', '0');
 
     let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     drawStatBox(885, 45, 150, 70, 'UPDATED', dateStr);
 
+    // المركز الأول (#1)
     ctx.fillStyle = 'rgba(255, 180, 100, 0.05)';
     ctx.strokeStyle = 'rgba(255, 180, 100, 0.4)';
     ctx.lineWidth = 2;
@@ -158,7 +159,7 @@ async function generateTopBoardImage(sortedGroups) {
 
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 32px sans-serif';
-        ctx.fillText(topGroup.name || 'USER', 200, 280);
+        ctx.fillText(topGroup.name || 'GROUP', 200, 280);
 
         ctx.fillStyle = '#8b9bb4';
         ctx.font = '14px sans-serif';
@@ -197,6 +198,14 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.font = '12px sans-serif';
         ctx.fillText('Leading the board', 65, 535);
         ctx.fillText('Defend the crown.', 320, 535);
+    } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.fillText('GROUP', 200, 280);
+
+        ctx.fillStyle = '#8b9bb4';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('Leader • user', 200, 315);
     }
 
     let cardPositions = [
@@ -208,6 +217,7 @@ async function generateTopBoardImage(sortedGroups) {
         { x: 840, y: 400 }
     ];
 
+    // المراكز من #2 إلى #7
     for (let i = 1; i <= 6; i++) {
         let g = sortedGroups[i];
         let pos = cardPositions[i - 1];
@@ -248,7 +258,7 @@ async function generateTopBoardImage(sortedGroups) {
 
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px sans-serif';
-            ctx.fillText(g.name || 'USER', pos.x + 85, pos.y + 55);
+            ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 55);
 
             ctx.fillStyle = '#8b9bb4';
             ctx.font = '12px sans-serif';
@@ -266,7 +276,7 @@ async function generateTopBoardImage(sortedGroups) {
         } else {
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px sans-serif';
-            ctx.fillText('USER', pos.x + 85, pos.y + 55);
+            ctx.fillText('GROUP', pos.x + 85, pos.y + 55);
 
             ctx.fillStyle = '#8b9bb4';
             ctx.font = '12px sans-serif';
@@ -315,6 +325,11 @@ client.on('ready', () => {
     loadDb();
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
     updateTopGroupsBoard();
+
+    // تحديث وتناوب اللوحة تلقائياً وحذف القديمة كل 30 ثانية
+    setInterval(() => {
+        updateTopGroupsBoard();
+    }, 30000);
 });
 
 client.on('messageCreate', async (message) => {
@@ -331,7 +346,6 @@ client.on('messageCreate', async (message) => {
 
         let userGroups = getLeaderOrOwnedGroups(targetMember);
         if (userGroups.length === 0) {
-            // محاولة ثانية: البحث بالرول أو الـ ID مباشرة في قاعدة البيانات
             let foundKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === targetMember.id || targetMember.roles.cache.has(db.groups[k].roleId));
             if (!foundKey) {
                 return message.channel.send({ content: 'هذا الشخص ليس لديه قروب.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
@@ -505,6 +519,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
+    // احتساب الإكس بي للرومات الكتابية فقط (تجاهل الرومات الصوتية كلياً لمنع السبام)
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
