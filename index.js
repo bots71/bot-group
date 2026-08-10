@@ -59,24 +59,12 @@ async function updateTopGroupsBoard() {
         const topGroup = sortedGroups[0] ? sortedGroups[0][1] : null;
 
         const embed = new EmbedBuilder()
-            .setTitle('Top 7 Groups')
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
 
         if (topGroup) {
             embed.setThumbnail(topGroup.leaderAvatar || null);
         }
-
-        let descText = "";
-        for (let i = 0; i < 7; i++) {
-            let g = sortedGroups[i] ? sortedGroups[i][1] : null;
-            let rankNum = i + 1;
-            let groupName = g ? g.name : "USER";
-            let groupXp = g ? (g.xp || 0) : 0;
-            let leaderName = g ? `<@${g.leaderId}>` : "user";
-            descText += `Rank #${rankNum}: **${groupName}** | XP: ${groupXp} | Leader: ${leaderName}\n`;
-        }
-        embed.setDescription(descText);
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
@@ -102,6 +90,36 @@ client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
     const hasAllowedRole = message.member.roles.cache.has(ALLOWED_CREATOR_ID) || message.author.id === ALLOWED_CREATOR_ID;
+
+    if (message.content.startsWith('delete group')) {
+        if (!hasAllowedRole) return;
+        const targetMember = message.mentions.members.first();
+        if (!targetMember) {
+            return message.channel.send({ content: 'منشن ليدر القروب المراد حذفه.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+        }
+
+        let groupsObj = db.groups.groups || db.groups;
+        let foundKey = Object.keys(groupsObj).find(k => groupsObj[k].leaderId === targetMember.id);
+        if (!foundKey) {
+            return message.channel.send({ content: 'هذا الشخص ليس لديه قروب.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+        }
+
+        let myGroup = groupsObj[foundKey];
+        try {
+            let guild = message.guild;
+            let tChan = guild.channels.cache.get(myGroup.textChannelId);
+            let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+            let role = guild.roles.cache.get(myGroup.roleId);
+            if (tChan) await tChan.delete().catch(() => {});
+            if (vChan) await vChan.delete().catch(() => {});
+            if (role) await role.delete().catch(() => {});
+        } catch (e) {}
+
+        delete groupsObj[foundKey];
+        saveDb();
+        await message.channel.send({ content: 'تم حذف القروب بنجاح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+        return;
+    }
 
     if (message.content === '!setup') {
         if (!hasAllowedRole || message.channel.id !== CHANNELS.LEADER_PANEL) {
@@ -162,7 +180,7 @@ client.on('messageCreate', async (message) => {
             let groupsObj = db.groups.groups || db.groups;
             let existingUserCheck = Object.values(groupsObj).find(g => g.leaderId === targetOwner.id || (g.members && g.members.includes(targetOwner.id)));
             if (existingUserCheck) {
-                return message.channel.send({ content: 'هذا الشخص لديك جروب من قبل لا تستطيع' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+                return message.channel.send({ content: 'هذا الشخص معه جروب لازم يحذفه عشان يقدر يدخل' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
             const namePrompt = await message.channel.send({ content: 'اكتب اسم الجروب:' });
@@ -461,7 +479,7 @@ client.on('interactionCreate', async (interaction) => {
             for (const [targetId, targetMember] of targetMembers) {
                 let existingGroupCheck = Object.values(groupsObj).find(g => g.leaderId === targetId || (g.members && g.members.includes(targetId)));
                 if (existingGroupCheck) {
-                    const failMsg = await interaction.followUp({ content: 'العضو هذا داخل جروب ثاني', ephemeral: true });
+                    const failMsg = await interaction.followUp({ content: 'هذا الشخص داخل جروبين', ephemeral: true });
                     setTimeout(() => failMsg.delete().catch(() => {}), 5000);
                     continue;
                 }
