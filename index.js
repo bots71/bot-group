@@ -130,7 +130,7 @@ async function generateTopBoardImage(sortedGroups) {
 
     let topGroup = sortedGroups[0];
     if (topGroup) {
-        // رسم الأفاتار بشكل دائري صحيح وصحيح المقاسات
+        // رسم الأفاتار بشكل دائري صحيح ومقاس واضح
         ctx.save();
         ctx.beginPath();
         ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
@@ -315,6 +315,7 @@ client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
     updateTopGroupsBoard();
 
+    // التحديث كل 30 ثانية فقط تلقائياً دون إزعاج أو تكرار عشوائي
     setInterval(() => {
         updateTopGroupsBoard();
     }, 30000);
@@ -459,7 +460,6 @@ client.on('messageCreate', async (message) => {
                         createdAt: Date.now()
                     };
                     saveDb();
-                    await updateTopGroupsBoard();
 
                     await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
@@ -470,7 +470,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // احتساب الـ XP فقط للرومات الكتابية الخاصة بالقروبات
+    // احتساب الـ XP (تتم زيادة XP بمقدار 2 مع كل رسالة بدون عمل تحديث فوري للروم لمنع إرسال الصور المتكرر)
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
@@ -487,7 +487,6 @@ client.on('messageCreate', async (message) => {
             userGroup.xp = (userGroup.xp || 0) + 2;
             userGroup.textCount = (userGroup.textCount || 0) + 1;
             saveDb();
-            await updateTopGroupsBoard();
         }
     }
 });
@@ -551,7 +550,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_edit_role') {
-        const replyMsg = await interaction.followUp({ content: 'اسم الرول مرتبط باسم القروب.', ephemeral: true });
+        const replyMsg = await interaction.followUp({ content: 'اسم الرول مرتبط باسم القروب.', ephemeral: type => {} }, ephemeral: true);
         setTimeout(() => replyMsg.delete().catch(() => {}), 5000);
         return;
     }
@@ -571,7 +570,7 @@ client.on('interactionCreate', async (interaction) => {
     if (selectedValue === 'btn_leave_group') {
         try {
             let tChan = guild.channels.cache.get(myGroup.textChannelId);
-            let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+            let vChan = guild.channels.cache.get(myKey => guild.channels.cache.get(myGroup.voiceChannelId));
             let role = guild.roles.cache.get(myGroup.roleId);
             if (tChan) await tChan.delete().catch(() => {});
             if (vChan) await vChan.delete().catch(() => {});
@@ -580,7 +579,6 @@ client.on('interactionCreate', async (interaction) => {
 
         delete db.groups[myGroupKey];
         saveDb();
-        await updateTopGroupsBoard();
         const replyMsg = await interaction.followUp({ content: 'تم حذف قروبك بنجاح.', ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         return;
