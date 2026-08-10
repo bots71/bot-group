@@ -111,7 +111,6 @@ async function generateTopBoardImage(sortedGroups) {
     let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     drawStatBox(865, 35, 145, 65, 'UPDATED', dateStr);
 
-    // بطاقة المركز الأول
     ctx.fillStyle = 'rgba(41, 65, 104, 0.25)';
     ctx.strokeStyle = 'rgba(119, 141, 169, 0.4)';
     ctx.lineWidth = 2;
@@ -130,7 +129,6 @@ async function generateTopBoardImage(sortedGroups) {
 
     let topGroup = sortedGroups[0];
     if (topGroup) {
-        // رسم الأفاتار بشكل دائري صحيح ومقاس واضح
         ctx.save();
         ctx.beginPath();
         ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
@@ -197,7 +195,6 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.fillText('LED BY NONE', 190, 280);
     }
 
-    // المراكز من 2 إلى 7
     let cardPositions = [
         { x: 480, y: 130 },
         { x: 840, y: 130 },
@@ -315,7 +312,6 @@ client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
     updateTopGroupsBoard();
 
-    // التحديث كل 30 ثانية فقط تلقائياً دون إزعاج أو تكرار عشوائي
     setInterval(() => {
         updateTopGroupsBoard();
     }, 30000);
@@ -470,7 +466,6 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // احتساب الـ XP (تتم زيادة XP بمقدار 2 مع كل رسالة بدون عمل تحديث فوري للروم لمنع إرسال الصور المتكرر)
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
@@ -550,7 +545,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_edit_role') {
-        const replyMsg = await interaction.followUp({ content: 'اسم الرول مرتبط باسم القروب.', ephemeral: type => {} }, ephemeral: true);
+        const replyMsg = await interaction.followUp({ content: 'اسم الرول مرتبط باسم القروب.', ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 5000);
         return;
     }
@@ -570,7 +565,7 @@ client.on('interactionCreate', async (interaction) => {
     if (selectedValue === 'btn_leave_group') {
         try {
             let tChan = guild.channels.cache.get(myGroup.textChannelId);
-            let vChan = guild.channels.cache.get(myKey => guild.channels.cache.get(myGroup.voiceChannelId));
+            let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
             let role = guild.roles.cache.get(myGroup.roleId);
             if (tChan) await tChan.delete().catch(() => {});
             if (vChan) await vChan.delete().catch(() => {});
