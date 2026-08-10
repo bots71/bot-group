@@ -118,7 +118,6 @@ async function generateTopBoardImage(sortedGroups) {
     let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     drawStatBox(885, 45, 150, 70, 'UPDATED', dateStr);
 
-    // المركز الأول (#1)
     ctx.fillStyle = 'rgba(255, 180, 100, 0.05)';
     ctx.strokeStyle = 'rgba(255, 180, 100, 0.4)';
     ctx.lineWidth = 2;
@@ -217,7 +216,6 @@ async function generateTopBoardImage(sortedGroups) {
         { x: 840, y: 400 }
     ];
 
-    // المراكز من #2 إلى #7
     for (let i = 1; i <= 6; i++) {
         let g = sortedGroups[i];
         let pos = cardPositions[i - 1];
@@ -326,7 +324,6 @@ client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
     updateTopGroupsBoard();
 
-    // تحديث وتناوب اللوحة تلقائياً وحذف القديمة كل 30 ثانية
     setInterval(() => {
         updateTopGroupsBoard();
     }, 30000);
@@ -416,7 +413,7 @@ client.on('messageCreate', async (message) => {
         }
 
         await message.react('✅').catch(() => {});
-        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح ليدر للجروب:', ephemeral: true }).catch(() => null);
+        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح ليدر للجروب:' }).catch(() => null);
 
         const filter = m => m.author.id === message.author.id;
         const collector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
@@ -519,7 +516,6 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // احتساب الإكس بي للرومات الكتابية فقط (تجاهل الرومات الصوتية كلياً لمنع السبام)
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
@@ -546,6 +542,9 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isStringSelectMenu()) return;
     if (interaction.customId !== 'leader_select_menu') return;
 
+    // استجابة فورية لمنع خطأ الـ 3 ثواني
+    await interaction.deferUpdate().catch(() => {});
+
     const guild = interaction.guild;
     const member = interaction.member;
     const userId = member.id;
@@ -570,7 +569,7 @@ client.on('interactionCreate', async (interaction) => {
         ]);
 
     const row = new ActionRowBuilder().addComponents(currentSelectMenu);
-    await interaction.update({ components: [row] }).catch(() => {});
+    await interaction.editReply({ components: [row] }).catch(() => {});
 
     if (selectedValue === 'btn_role_color') {
         if (!isLeader) {
