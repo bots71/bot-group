@@ -7,6 +7,13 @@ const {
     EmbedBuilder 
 } = require('discord.js');
 const fs = require('fs');
+const http = require('http');
+
+// سيرفر وهمي بسيط عشان Render ما يقفل البوت ولا يعطيني خطأ بورت
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot is running successfully!');
+}).listen(process.env.PORT || 3000);
 
 const client = new Client({
     intents: [
@@ -41,14 +48,12 @@ client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
 });
 
-// أمر إرسال اللوحات والأزرار للرومات (اكتب في أي شات !setup)
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
     if (message.content === '!setup') {
         if (!message.member.permissions.has('Administrator')) return;
 
-        // 1. إرسال لوحة ليدر في روم LEADER_PANEL
         const leaderChannel = message.guild.channels.cache.get(CHANNELS.LEADER_PANEL);
         if (leaderChannel) {
             const embed = new EmbedBuilder()
@@ -77,7 +82,6 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // احتساب الـ XP للرسائل (كل كلمة = 2 XP)
     let groupsObj = db.groups.groups || db.groups;
     let userGroup = Object.values(groupsObj).find(g => g.leaderId === message.author.id || (g.members && g.members.includes(message.author.id)));
     
@@ -86,17 +90,10 @@ client.on('messageCreate', async (message) => {
         const earnedXp = wordsCount * 2;
         userGroup.xp = (userGroup.xp || 0) + earnedXp;
         userGroup.textCount = (userGroup.textCount || 0) + wordsCount;
-
-        if (userGroup.xp >= 5000) {
-            let increments = Math.floor(userGroup.xp / 5000);
-            userGroup.xp += increments * 1000;
-            userGroup.xp = userGroup.xp % 5000;
-        }
         saveDb();
     }
 });
 
-// التعامل مع الأزرار والقوائم
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
@@ -169,12 +166,6 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (customId.startsWith('decline_invite_')) {
-        const gKey = customId.replace('decline_invite_', '');
-        const targetGroup = groupsObj[gKey];
-        if (targetGroup) {
-            const leaderUser = await client.users.fetch(targetGroup.leaderId).catch(() => null);
-            if (leaderUser) await leaderUser.send(`الشخص رفض الدعوة فقط`).catch(() => {});
-        }
         return interaction.update({ content: 'تم رفض الدعوة.', components: [] });
     }
 
@@ -202,7 +193,6 @@ client.on('interactionCreate', async (interaction) => {
 -1- أعضاء القروب: ${(myGroup.members ? myGroup.members.length : 0) + 1}
 -2- كم كلمة باليوم: ${myGroup.textCount || 0}
 -3- كم اكس بي القروب: ${myGroup.xp || 0}
--4- تفاعل الفويس واكس بي الفويس: ${myGroup.voiceXp || 0}
         `.trim();
         return interaction.reply({ content: stats, ephemeral: true });
     }
