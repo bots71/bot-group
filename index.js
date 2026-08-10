@@ -48,8 +48,6 @@ function saveDb() {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 4));
 }
 
-let topGroupsMessage = null;
-
 async function updateTopGroupsBoard() {
     try {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
@@ -63,18 +61,15 @@ async function updateTopGroupsBoard() {
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
 
-        if (!topGroupsMessage) {
-            const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
-            if (messages) {
-                topGroupsMessage = messages.find(m => m.author.id === client.user.id);
+        const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+        if (messages) {
+            const botMessages = messages.filter(m => m.author.id === client.user.id);
+            for (const [id, msg] of botMessages) {
+                await msg.delete().catch(() => {});
             }
         }
 
-        if (topGroupsMessage) {
-            await topGroupsMessage.edit({ embeds: [embed] }).catch(() => { topGroupsMessage = null; });
-        } else {
-            topGroupsMessage = await channel.send({ embeds: [embed] });
-        }
+        await channel.send({ embeds: [embed] });
     } catch (e) {
         console.error(e);
     }
@@ -166,13 +161,21 @@ client.on('messageCreate', async (message) => {
                 try {
                     const guild = message.guild;
                     
+                    const groupRole = await guild.roles.create({
+                        name: groupName,
+                        color: DefaultResolver = '#2b2d31',
+                        reason: 'Group Role'
+                    });
+
+                    await targetOwner.roles.add(groupRole).catch(() => {});
+
                     const textChannel = await guild.channels.create({
                         name: groupName,
                         type: ChannelType.GuildText,
                         parent: CHANNELS.TEXT_CATEGORY,
                         permissionOverwrites: [
                             { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                            { id: targetOwner.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                            { id: groupRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
                         ]
                     });
 
@@ -182,12 +185,13 @@ client.on('messageCreate', async (message) => {
                         parent: CHANNELS.VOICE_CATEGORY,
                         permissionOverwrites: [
                             { id: guild.id, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
-                            { id: targetOwner.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] }
+                            { id: groupRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] }
                         ]
                     });
 
                     groupsObj[groupKey] = {
                         name: groupName,
+                        roleId: groupRole.id,
                         leaderId: targetOwner.id,
                         leaderAvatar: targetOwner.user.displayAvatarURL({ extension: 'png', size: 256 }),
                         members: [],
@@ -214,10 +218,9 @@ client.on('messageCreate', async (message) => {
     
     if (userGroupKey) {
         let userGroup = groupsObj[userGroupKey];
-        const wordsCount = message.content.trim().split(/\s+/).length;
-        const earnedXp = wordsCount * 2;
+        const earnedXp = 2;
         userGroup.xp = (userGroup.xp || 0) + earnedXp;
-        userGroup.textCount = (userGroup.textCount || 0) + wordsCount;
+        userGroup.textCount = (userGroup.textCount || 0) + 1;
 
         if (userGroup.xp >= 5000) {
             let increments = Math.floor(userGroup.xp / 5000);
@@ -244,8 +247,10 @@ setInterval(async () => {
                     if (guild) {
                         let tChan = guild.channels.cache.get(g.textChannelId);
                         let vChan = guild.channels.cache.get(g.voiceChannelId);
+                        let role = guild.roles.cache.get(g.roleId);
                         if (tChan) await tChan.delete().catch(() => {});
                         if (vChan) await vChan.delete().catch(() => {});
+                        if (role) await role.delete().catch(() => {});
                     }
                 } catch (e) {}
                 delete groupsObj[key];
@@ -276,7 +281,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_role_color') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
-        return interaction.reply({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
+        await interaction.reply({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        return;
     }
 
     if (selectedValue === 'btn_edit_role') {
@@ -287,6 +294,7 @@ client.on('interactionCreate', async (interaction) => {
         } catch (e) {}
 
         await interaction.reply({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 15000, max: 1 });
@@ -299,13 +307,16 @@ client.on('interactionCreate', async (interaction) => {
             try {
                 let tChan = guild.channels.cache.get(myGroup.textChannelId);
                 let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                let role = guild.roles.cache.get(myGroup.roleId);
                 if (tChan) await tChan.setName(newName).catch(()=>{});
                 if (vChan) await vChan.setName(newName).catch(()=>{});
+                if (role) await role.setName(newName).catch(()=>{});
                 await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: null });
             } catch (e) {}
 
             saveDb();
-            await interaction.editReply({ content: `تم تحديث اسم القروب إلى: **${newName}**` }).catch(() => {});
+            const successMsg = await interaction.channel.send({ content: `تم تحديث اسم القروب إلى: **${newName}**` }).catch(() => {});
+            if (successMsg) setTimeout(() => successMsg.delete().catch(() => {}), 5000);
         });
     }
 
@@ -317,6 +328,7 @@ client.on('interactionCreate', async (interaction) => {
         } catch (e) {}
 
         await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم:', ephemeral: true });
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
@@ -328,7 +340,11 @@ client.on('interactionCreate', async (interaction) => {
             } catch (e) {}
 
             const targetMembers = msg.mentions.members;
-            if (!targetMembers || targetMembers.size === 0) return interaction.followUp({ content: 'لم يتم العثور على أعضاء.', ephemeral: true });
+            if (!targetMembers || targetMembers.size === 0) {
+                const failMsg = await interaction.channel.send({ content: 'لم يتم العثور على أعضاء.' });
+                setTimeout(() => failMsg.delete().catch(() => {}), 5000);
+                return;
+            }
 
             const inviteRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`accept_invite_${myGroupKey}`).setLabel('قبول').setStyle(ButtonStyle.Success),
@@ -341,7 +357,8 @@ client.on('interactionCreate', async (interaction) => {
                 } catch (e) {}
             });
 
-            await interaction.followUp({ content: 'تم إرسال الدعوات بنجاح.', ephemeral: true });
+            const successMsg = await interaction.channel.send({ content: 'تم إرسال الدعوات بنجاح.' });
+            setTimeout(() => successMsg.delete().catch(() => {}), 5000);
         });
     }
 
@@ -353,6 +370,7 @@ client.on('interactionCreate', async (interaction) => {
         } catch (e) {}
 
         await interaction.reply({ content: 'منشن العضو أو اكتب اليوزر المراد طرده:', ephemeral: true });
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
@@ -366,57 +384,78 @@ client.on('interactionCreate', async (interaction) => {
             const targetMember = msg.mentions.members.first() || guild.members.cache.find(m => m.user.username === msg.content.trim() || m.user.tag === msg.content.trim() || m.id === msg.content.trim());
 
             if (!targetMember) {
-                return interaction.followUp({ content: 'المينشن واليوزر غير صحيح', ephemeral: true });
+                const errorMsg = await interaction.user.send({ content: 'المينشن واليوزر غير صحيح' }).catch(() => null);
+                if (!errorMsg) {
+                    const fallbackMsg = await interaction.channel.send({ content: `<@${userId}> المينشن واليوزر غير صحيح` });
+                    setTimeout(() => fallbackMsg.delete().catch(() => {}), 5000);
+                }
+                return;
             }
 
             myGroup.members = myGroup.members.filter(id => id !== targetMember.id);
             
             try {
-                let tChan = guild.channels.cache.get(myGroup.textChannelId);
-                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
-                if (tChan) await tChan.permissionOverwrites.delete(targetMember.id).catch(()=>{});
-                if (vChan) await vChan.permissionOverwrites.delete(targetMember.id).catch(()=>{});
+                if (myGroup.roleId) {
+                    await targetMember.roles.remove(myGroup.roleId).catch(() => {});
+                }
             } catch (e) {}
 
             saveDb();
-            await interaction.followUp({ content: 'تم طرد العضو المحدد بنجاح.', ephemeral: true });
+            const successMsg = await interaction.channel.send({ content: 'تم طرد العضو المحدد بنجاح.' });
+            setTimeout(() => successMsg.delete().catch(() => {}), 5000);
         });
     }
 
     if (selectedValue === 'btn_my_stats') {
-        if (!myGroup) return interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
+        if (!myGroup) {
+            await interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            return;
+        }
         const stats = `
 -1- أعضاء القروب: ${(myGroup.members ? myGroup.members.length : 0) + 1}
 -2- كم كلمة باليوم: ${myGroup.textCount || 0}
 -3- كم اكس بي القروب: ${myGroup.xp || 0}
         `.trim();
-        return interaction.reply({ content: stats, ephemeral: true });
+        await interaction.reply({ content: stats, ephemeral: true });
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        return;
     }
 
     if (selectedValue === 'btn_leave_group') {
-        if (!myGroup) return interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
+        if (!myGroup) {
+            await interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            return;
+        }
         if (isLeader) {
             try {
                 let tChan = guild.channels.cache.get(myGroup.textChannelId);
                 let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                let role = guild.roles.cache.get(myGroup.roleId);
                 if (tChan) await tChan.delete().catch(() => {});
                 if (vChan) await vChan.delete().catch(() => {});
+                if (role) await role.delete().catch(() => {});
             } catch (e) {}
 
             delete groupsObj[myGroupKey];
             saveDb();
-            return interaction.reply({ content: 'تم حذف القروب بنجاح.', ephemeral: true });
+            await interaction.reply({ content: 'تم حذف القروب بنجاح.', ephemeral: true });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            return;
         } else {
             myGroup.members = myGroup.members.filter(id => id !== userId);
             try {
-                let tChan = guild.channels.cache.get(myGroup.textChannelId);
-                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
-                if (tChan) await tChan.permissionOverwrites.delete(userId).catch(()=>{});
-                if (vChan) await vChan.permissionOverwrites.delete(userId).catch(()=>{});
+                if (myGroup.roleId) {
+                    let memberObj = await guild.members.fetch(userId).catch(() => null);
+                    if (memberObj) await memberObj.roles.remove(myGroup.roleId).catch(() => {});
+                }
             } catch (e) {}
 
             saveDb();
-            return interaction.reply({ content: 'تم خروجك من القروب.', ephemeral: true });
+            await interaction.reply({ content: 'تم خروجك من القروب.', ephemeral: true });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            return;
         }
     }
 });
@@ -438,10 +477,10 @@ client.on('interactionCreate', async (interaction) => {
                 saveDb();
 
                 try {
-                    let tChan = guild.channels.cache.get(targetGroup.textChannelId);
-                    let vChan = guild.channels.cache.get(targetGroup.voiceChannelId);
-                    if (tChan) await tChan.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true }).catch(()=>{});
-                    if (vChan) await vChan.permissionOverwrites.create(userId, { ViewChannel: true, Connect: true, Speak: true }).catch(()=>{});
+                    let memberObj = await guild.members.fetch(userId).catch(() => null);
+                    if (memberObj && targetGroup.roleId) {
+                        await memberObj.roles.add(targetGroup.roleId).catch(() => {});
+                    }
                 } catch (e) {}
             }
         }
