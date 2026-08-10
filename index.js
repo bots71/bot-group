@@ -478,10 +478,19 @@ client.on('messageCreate', async (message) => {
     }
 
     if (message.channel.type === ChannelType.GuildText) {
-        let userGroupKey = Object.keys(db.groups).find(k => db.groups[k].textChannelId === message.channel.id || db.groups[k].leaderId === message.author.id || (db.groups[k].members && db.groups[k].members.includes(message.author.id)));
+        let userGroupKey = Object.keys(db.groups).find(k => {
+            let g = db.groups[k];
+            return g.textChannelId === message.channel.id || 
+                   g.leaderId === message.author.id || 
+                   (g.members && g.members.includes(message.author.id)) ||
+                   (g.name && message.channel.name && g.name.toLowerCase() === message.channel.name.toLowerCase());
+        });
         
         if (userGroupKey) {
             let userGroup = db.groups[userGroupKey];
+            if (userGroup.textChannelId !== message.channel.id) {
+                userGroup.textChannelId = message.channel.id;
+            }
             userGroup.xp = (userGroup.xp || 0) + 2;
             userGroup.textCount = (userGroup.textCount || 0) + 1;
             saveDb();
@@ -805,7 +814,7 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.update({ content: 'تم انضمامك للقروب بنجاح!', components: [] });
     }
 
-    if (customId.startsWith('decline_invite_')) {
+    if (customId.startsWith('default_invite_') || customId.startsWith('decline_invite_')) {
         return interaction.update({ content: 'تم رفض الدعوة.', components: [] });
     }
 });
