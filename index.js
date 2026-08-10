@@ -71,141 +71,148 @@ async function generateTopBoardImage(sortedGroups) {
     const canvas = createCanvas(1200, 675);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0b0f19';
+    // الخلفية الزرقاء الفخمة المتناسقة مع التصميم المطلوب
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bgGradient.addColorStop(0, '#0d1b2a');
+    bgGradient.addColorStop(0.5, '#1b263b');
+    bgGradient.addColorStop(1, '#0d1b2a');
+    ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.fillText('MYTH', 120, 75);
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText('groups', 120, 65);
 
-    ctx.fillStyle = '#8b9bb4';
-    ctx.font = '16px sans-serif';
-    ctx.fillText('Performance board / activity • voice • events', 120, 105);
+    ctx.fillStyle = '#778da9';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('Performance board / activity • voice • events', 120, 95);
 
     let totalXpAll = sortedGroups.reduce((acc, g) => acc + (g.xp || 0), 0);
     let totalGroupsCount = sortedGroups.length;
 
     function drawStatBox(x, y, w, h, title, val) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.roundRect(x, y, w, h, 12);
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#8b9bb4';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(title, x + 20, y + 25);
+        ctx.fillStyle = '#778da9';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(title, x + 15, y + 22);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px sans-serif';
-        ctx.fillText(val, x + 20, y + 52);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText(val, x + 15, y + 48);
     }
 
-    drawStatBox(520, 45, 95, 70, 'GROUPS', totalGroupsCount.toString());
-    drawStatBox(630, 45, 120, 70, 'TOTAL XP', totalXpAll.toLocaleString());
-    drawStatBox(765, 45, 105, 70, 'EVENT WINS', '0');
+    drawStatBox(520, 35, 95, 65, 'GROUPS', totalGroupsCount.toString());
+    drawStatBox(625, 35, 115, 65, 'TOTAL XP', totalXpAll.toLocaleString());
+    drawStatBox(750, 35, 105, 65, 'EVENT WINS', '0');
 
     let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    drawStatBox(885, 45, 150, 70, 'UPDATED', dateStr);
+    drawStatBox(865, 35, 145, 65, 'UPDATED', dateStr);
 
-    ctx.fillStyle = 'rgba(255, 180, 100, 0.05)';
-    ctx.strokeStyle = 'rgba(255, 180, 100, 0.4)';
+    // بطاقة المركز الأول (Champion)
+    ctx.fillStyle = 'rgba(41, 65, 104, 0.25)';
+    ctx.strokeStyle = 'rgba(119, 141, 169, 0.4)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(45, 150, 410, 475, 16);
+    ctx.roundRect(45, 130, 410, 500, 16);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('#1', 75, 190);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('#1', 75, 165);
 
-    ctx.fillStyle = '#8b9bb4';
+    ctx.fillStyle = '#778da9';
     ctx.font = '12px sans-serif';
-    ctx.fillText('CURRENT CHAMPION', 115, 190);
+    ctx.fillText('CURRENT CHAMPION', 105, 165);
 
     let topGroup = sortedGroups[0];
     if (topGroup) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
+        ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
         ctx.closePath();
         ctx.clip();
         try {
             const avatarImg = await loadImage(topGroup.leaderAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png');
-            ctx.drawImage(avatarImg, 80, 240, 100, 100);
+            ctx.drawImage(avatarImg, 80, 215, 90, 90);
         } catch (e) {
             ctx.fillStyle = '#333';
-            ctx.fillRect(80, 240, 100, 100);
+            ctx.fillRect(80, 215, 90, 90);
         }
         ctx.restore();
 
-        ctx.strokeStyle = '#ffb464';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#778da9';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
+        ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
         ctx.stroke();
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px sans-serif';
-        ctx.fillText(topGroup.name || 'GROUP', 200, 270);
+        ctx.font = 'bold 28px sans-serif';
+        ctx.fillText(topGroup.name || 'GROUP', 190, 245);
 
-        ctx.fillStyle = '#8b9bb4';
-        ctx.font = '14px sans-serif';
-        ctx.fillText(`Leader • ${topGroup.leaderName || 'user'}`, 200, 310);
+        ctx.fillStyle = '#778da9';
+        ctx.font = '13px sans-serif';
+        ctx.fillText(`LED BY ${topGroup.leaderName || 'USER'}`, 190, 275);
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillStyle = 'rgba(13, 27, 42, 0.5)';
         ctx.beginPath();
-        ctx.roundRect(65, 375, 200, 65, 10);
-        ctx.roundRect(280, 375, 155, 65, 10);
+        ctx.roundRect(65, 345, 200, 60, 10);
+        ctx.roundRect(275, 345, 160, 60, 10);
         ctx.fill();
 
-        ctx.fillStyle = '#8b9bb4';
-        ctx.font = '11px sans-serif';
-        ctx.fillText('TOTAL EXPERIENCE', 80, 400);
-        ctx.fillText('EVENT WINS', 295, 400);
-
-        ctx.fillStyle = '#ffb464';
-        ctx.font = 'bold 28px sans-serif';
-        ctx.fillText((topGroup.xp || 0).toLocaleString(), 80, 430);
+        ctx.fillStyle = '#778da9';
+        ctx.font = '10px sans-serif';
+        ctx.fillText('TOTAL EXPERIENCE', 80, 370);
+        ctx.fillText('EVENT WINS', 290, 370);
 
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 24px sans-serif';
-        ctx.fillText('0', 295, 430);
+        ctx.fillText((topGroup.xp || 0).toLocaleString(), 80, 395);
 
-        ctx.fillStyle = '#222';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.fillText('0', 290, 395);
+
+        ctx.fillStyle = '#1b263b';
         ctx.beginPath();
-        ctx.roundRect(65, 495, 370, 8, 4);
+        ctx.roundRect(65, 465, 370, 6, 3);
         ctx.fill();
 
-        ctx.fillStyle = '#ffb464';
+        ctx.fillStyle = '#778da9';
         ctx.beginPath();
-        ctx.roundRect(65, 495, 370, 8, 4);
+        ctx.roundRect(65, 465, 370, 6, 3);
         ctx.fill();
 
-        ctx.fillStyle = '#8b9bb4';
+        ctx.fillStyle = '#778da9';
         ctx.font = '12px sans-serif';
-        ctx.fillText('Leading the board', 65, 535);
-        ctx.fillText('Defend the crown.', 320, 535);
+        ctx.fillText('Leading the board', 65, 510);
+        ctx.fillText('Defend the crown.', 315, 510);
     } else {
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px sans-serif';
-        ctx.fillText('NO GROUP', 200, 280);
+        ctx.font = 'bold 28px sans-serif';
+        ctx.fillText('NO GROUP', 190, 250);
 
-        ctx.fillStyle = '#8b9bb4';
-        ctx.font = '14px sans-serif';
-        ctx.fillText('Leader • none', 200, 315);
+        ctx.fillStyle = '#778da9';
+        ctx.font = '13px sans-serif';
+        ctx.fillText('LED BY NONE', 190, 280);
     }
 
+    // المراكز من 2 إلى 7
     let cardPositions = [
-        { x: 480, y: 150 },
-        { x: 840, y: 150 },
-        { x: 480, y: 275 },
-        { x: 840, y: 275 },
-        { x: 480, y: 400 },
-        { x: 840, y: 400 }
+        { x: 480, y: 130 },
+        { x: 840, y: 130 },
+        { x: 480, y: 255 },
+        { x: 840, y: 255 },
+        { x: 480, y: 380 },
+        { x: 840, y: 380 }
     ];
 
     for (let i = 1; i <= 6; i++) {
@@ -213,7 +220,7 @@ async function generateTopBoardImage(sortedGroups) {
         let pos = cardPositions[i - 1];
         if (!pos) break;
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -240,45 +247,46 @@ async function generateTopBoardImage(sortedGroups) {
             }
             ctx.restore();
 
-            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.strokeStyle = 'rgba(119, 141, 169, 0.3)';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
             ctx.stroke();
 
+            // اسم القروب بدلاً من يوزر
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 16px sans-serif';
+            ctx.font = 'bold 15px sans-serif';
             ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 50);
 
-            ctx.fillStyle = '#8b9bb4';
-            ctx.font = '12px sans-serif';
-            ctx.fillText(`Leader • ${g.leaderName || 'user'}`, pos.x + 85, pos.y + 75);
+            ctx.fillStyle = '#778da9';
+            ctx.font = '11px sans-serif';
+            ctx.fillText(`Leader • ${g.leaderName || 'USER'}`, pos.x + 85, pos.y + 75);
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 16px sans-serif';
+            ctx.font = 'bold 15px sans-serif';
             ctx.textAlign = 'right';
             ctx.fillText(`${(g.xp || 0).toLocaleString()} XP`, pos.x + 315, pos.y + 55);
 
-            ctx.fillStyle = '#8b9bb4';
-            ctx.font = '11px sans-serif';
+            ctx.fillStyle = '#778da9';
+            ctx.font = '10px sans-serif';
             ctx.fillText('0 WINS', pos.x + 315, pos.y + 78);
             ctx.textAlign = 'left';
         } else {
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px sans-serif';
+            ctx.font = 'bold 16px sans-serif';
             ctx.fillText('---', pos.x + 85, pos.y + 55);
 
-            ctx.fillStyle = '#8b9bb4';
-            ctx.font = '12px sans-serif';
+            ctx.fillStyle = '#778da9';
+            ctx.font = '11px sans-serif';
             ctx.fillText('Leader • ---', pos.x + 85, pos.y + 78);
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 16px sans-serif';
+            ctx.font = 'bold 15px sans-serif';
             ctx.textAlign = 'right';
             ctx.fillText('0 XP', pos.x + 315, pos.y + 55);
 
-            ctx.fillStyle = '#8b9bb4';
-            ctx.font = '11px sans-serif';
+            ctx.fillStyle = '#778da9';
+            ctx.font = '10px sans-serif';
             ctx.fillText('0 WINS', pos.x + 315, pos.y + 78);
             ctx.textAlign = 'left';
         }
@@ -471,6 +479,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
+    // احتساب الـ XP فقط للرومات الكتابية الخاصة بالقروبات (ولا يحتسب للرومات الصوتية)
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
