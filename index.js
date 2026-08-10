@@ -8,7 +8,10 @@ const {
     StringSelectMenuBuilder,
     ChannelType,
     PermissionFlagsBits,
-    AttachmentBuilder
+    AttachmentBuilder,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle
 } = require('discord.js');
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
@@ -354,7 +357,6 @@ client.on('messageCreate', async (message) => {
 
     if (message.content === '!setup') {
         if (!hasAllowedRole || message.channel.id !== CHANNELS.LEADER_PANEL) {
-            await message.react('❌').catch(() => {});
             return;
         }
 
@@ -362,7 +364,7 @@ client.on('messageCreate', async (message) => {
         if (leaderChannel) {
             const embed = new EmbedBuilder()
                 .setTitle('Leader Panel')
-                .setDescription('هنا يقدر ليدر القروب يتحكم بقروحه بشكل سريع ومنظم.')
+                .setDescription('هنا يقدر ليدر القروب يتحكم بقروبه بشكل سريع ومنظم.')
                 .setColor('#2b2d31')
                 .setThumbnail('https://cdn.discordapp.com/attachments/1531644529818472458/1536192486597197824/A2CE557C-489A-468B-826F-8076DE214463.png');
 
@@ -380,18 +382,15 @@ client.on('messageCreate', async (message) => {
 
             const row = new ActionRowBuilder().addComponents(selectMenu);
             await leaderChannel.send({ embeds: [embed], components: [row] });
-            await message.react('✅').catch(() => {});
         }
         return;
     }
 
     if (message.content.toLowerCase() === 'crator group') {
         if (!hasAllowedRole) {
-            await message.react('❌').catch(() => {});
             return;
         }
 
-        await message.react('✅').catch(() => {});
         const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح ليدر للجروب:' }).catch(() => null);
 
         const filter = m => m.author.id === message.author.id;
@@ -472,7 +471,6 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // --- هذا هو الجزء الأساسي لاحتساب الـ XP وربط الشات تلقائياً ---
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
@@ -508,6 +506,12 @@ client.on('interactionCreate', async (interaction) => {
     let myGroupKey = userOwnedGroups[0];
     let myGroup = myGroupKey ? db.groups[myGroupKey] : null;
 
+    if (!myGroup && interaction.values[0] !== 'btn_my_stats') {
+        const replyMsg = await interaction.followUp({ content: 'القائمة غير مخصصة لك أو ليس لديك قروب.', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
+        return;
+    }
+
     const selectedValue = interaction.values[0];
 
     const currentSelectMenu = new StringSelectMenuBuilder()
@@ -527,7 +531,7 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_my_stats') {
         if (!myGroup) {
-            const replyMsg = await interaction.followUp({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
+            const replyMsg = await interaction.followUp({ content: 'ليس لديك قروب لعرض إحصائياته.', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
         }
@@ -537,6 +541,48 @@ client.on('interactionCreate', async (interaction) => {
 -3- كم اكس بي القروب: ${myGroup.xp || 0}
         `.trim();
         const replyMsg = await interaction.followUp({ content: stats, ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
+        return;
+    }
+
+    if (selectedValue === 'btn_role_color') {
+        const replyMsg = await interaction.followUp({ content: 'اكتب كود اللون السداسي في الروم الآن.', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 5000);
+        return;
+    }
+
+    if (selectedValue === 'btn_edit_role') {
+        const replyMsg = await interaction.followUp({ content: 'اسم الرول مرتبط باسم القروب.', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 5000);
+        return;
+    }
+
+    if (selectedValue === 'btn_invite_member') {
+        const replyMsg = await interaction.followUp({ content: 'منشن العضو الذي تريد إضافته للقروب.', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 5000);
+        return;
+    }
+
+    if (selectedValue === 'btn_kick_member') {
+        const replyMsg = await interaction.followUp({ content: 'منشن العضو الذي تريد طرده من القروب.', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 5000);
+        return;
+    }
+
+    if (selectedValue === 'btn_leave_group') {
+        try {
+            let tChan = guild.channels.cache.get(myGroup.textChannelId);
+            let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+            let role = guild.roles.cache.get(myGroup.roleId);
+            if (tChan) await tChan.delete().catch(() => {});
+            if (vChan) await vChan.delete().catch(() => {});
+            if (role) await role.delete().catch(() => {});
+        } catch (e) {}
+
+        delete db.groups[myGroupKey];
+        saveDb();
+        await updateTopGroupsBoard();
+        const replyMsg = await interaction.followUp({ content: 'تم حذف قروبك بنجاح.', ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         return;
     }
