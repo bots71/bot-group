@@ -4,12 +4,14 @@ const {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle, 
-    EmbedBuilder 
+    EmbedBuilder,
+    StringSelectMenuBuilder,
+    ChannelType,
+    PermissionFlagsBits
 } = require('discord.js');
 const fs = require('fs');
 const http = require('http');
 
-// سيرفر وهمي بسيط عشان Render ما يقفل البوت ولا يعطيني خطأ بورت
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Bot is running successfully!');
@@ -28,9 +30,12 @@ const client = new Client({
 const CHANNELS = {
     TOP_GROUPS: "1535491143897325578",
     LEADER_PANEL: "1535491487763136542",
-    COLOR_ROOM: "1535406298781192292"
+    COLOR_ROOM: "1535406298781192292",
+    TEXT_CATEGORY: "1536221607645814874",
+    VOICE_CATEGORY: "1536221822717141012"
 };
 
+const ALLOWED_CREATOR_ID = "1535375782736560128";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
 
@@ -43,59 +48,223 @@ function saveDb() {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 4));
 }
 
+let topGroupsMessage = null;
+
+async function updateTopGroupsBoard() {
+    try {
+        const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
+        if (!channel) return;
+
+        let groupsObj = db.groups.groups || db.groups;
+        let sortedGroups = Object.entries(groupsObj).sort((a, b) => (b[1].xp || 0) - (a[1].xp || 0)).slice(0, 7);
+
+        let description = sortedGroups.length === 0 ? "لا توجد قروبات نشطة حالياً." : sortedGroups.map((g, index) => {
+            let data = g[1];
+            let membersCount = (data.members ? data.members.length : 0) + 1;
+            return `**${index + 1} | ${data.name}**\n- الأعضاء: ${membersCount}\n- الكلمات: ${data.textCount || 0}\n- الأكس بي: ${data.xp || 0}\n`;
+        }).join('\n');
+
+        const embed = new EmbedBuilder()
+            .setTitle('Top 7 Groups')
+            .setDescription(description)
+            .setColor('#2b2d31')
+            .setThumbnail('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
+
+        if (!topGroupsMessage) {
+            const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+            if (messages) {
+                topGroupsMessage = messages.find(m => m.author.id === client.user.id);
+            }
+        }
+
+        if (topGroupsMessage) {
+            await topGroupsMessage.edit({ embeds: [embed] }).catch(() => { topGroupsMessage = null; });
+        } else {
+            topGroupsMessage = await channel.send({ embeds: [embed] });
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
 client.on('ready', () => {
     loadDb();
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
+    setInterval(updateTopGroupsBoard, 30000);
 });
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
     if (message.content === '!setup') {
-        if (!message.member.permissions.has('Administrator')) return;
+        if (message.author.id !== ALLOWED_CREATOR_ID) {
+            await message.react('❌').catch(() => {});
+            return;
+        }
 
         const leaderChannel = message.guild.channels.cache.get(CHANNELS.LEADER_PANEL);
         if (leaderChannel) {
             const embed = new EmbedBuilder()
                 .setTitle('Leader Panel')
                 .setDescription('هنا يقدر ليدر القروب يتحكم بقروحه بشكل سريع ومنظم.')
-                .setColor('#0099ff');
+                .setColor('#2b2d31')
+                .setThumbnail('https://cdn.discordapp.com/attachments/1531644529818472458/1536192486597197824/A2CE557C-489A-468B-826F-8076DE214463.png?ex=6a7a823d&is=6a7930bd&hm=f3847c68a29e21539c5c2b84af48a5255a970a72bc9aa970732f9ac8e330ff11&');
 
-            const row1 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('btn_role_color').setLabel('Role Color (تغيير لون رول القروب)').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('btn_edit_role').setLabel('Edit Role (تعديل اسم رول القروب)').setStyle(ButtonStyle.Secondary)
-            );
-            const row2 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('btn_invite_member').setLabel('Invite Member (دعوة عضو أو أكثر)').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('btn_kick_member').setLabel('Kick Member (طرد عضو من القروب)').setStyle(ButtonStyle.Secondary)
-            );
-            const row3 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('btn_my_stats').setLabel('My Stats (عرض إحصائيات القروب)').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('btn_leave_group').setLabel('Leave / Delete Group (خروج أو حذف)').setStyle(ButtonStyle.Danger)
-            );
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('leader_select_menu')
+                .setPlaceholder('Choose a leader action')
+                .addOptions([
+                    { label: 'Role Color', description: 'تغيير لون رول القروب', value: 'btn_role_color', emoji: '🎨' },
+                    { label: 'Edit Role', description: 'تعديل اسم رول القروب', value: 'btn_edit_role', emoji: '✏️' },
+                    { label: 'Invite Member', description: 'دعوة عضو أو أكثر للقروب', value: 'btn_invite_member', emoji: '✉️' },
+                    { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member', emoji: '👢' },
+                    { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats', emoji: '📊' },
+                    { label: 'Leave Group', description: 'الخروج أو حذف القروب', value: 'btn_leave_group', emoji: '🚪' }
+                ]);
 
-            await leaderChannel.send({ embeds: [embed], components: [row1, row2, row3] });
-            await message.reply('تم إرسال لوحة التحكم بنجاح إلى روم الليدر!');
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            await leaderChannel.send({ embeds: [embed], components: [row] });
+            await message.react('✅').catch(() => {});
         } else {
-            await message.reply('لم يتم العثور على روم الليدر، تأكد من الآيدي.');
+            await message.react('❌').catch(() => {});
         }
         return;
     }
 
+    if (message.content.toLowerCase() === 'crator group') {
+        if (message.author.id !== ALLOWED_CREATOR_ID) {
+            await message.react('❌').catch(() => {});
+            return;
+        }
+
+        await message.react('✅').catch(() => {});
+        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح أونر للجروب:', ephemeral: true }).catch(() => null);
+
+        const filter = m => m.author.id === message.author.id;
+        const collector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
+
+        collector.on('collect', async (msg) => {
+            await msg.delete().catch(() => {});
+            if (replyMsg) await replyMsg.delete().catch(() => {});
+
+            const targetOwner = msg.mentions.members.first();
+            if (!targetOwner) {
+                return message.channel.send({ content: 'لم تقم بمنشن أي عضو صحيح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            }
+
+            let groupsObj = db.groups.groups || db.groups;
+            let existing = Object.values(groupsObj).find(g => g.leaderId === targetOwner.id);
+            if (existing) {
+                return message.channel.send({ content: 'هذا الشخص لديه قروب مسبقاً.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            }
+
+            const namePrompt = await message.channel.send({ content: 'ما هو اسم القروب؟' });
+            const nameCollector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
+
+            nameCollector.on('collect', async (nameMsg) => {
+                await nameMsg.delete().catch(() => {});
+                await namePrompt.delete().catch(() => {});
+
+                const groupName = nameMsg.content;
+                const groupKey = 'group_' + Date.now();
+
+                try {
+                    const guild = message.guild;
+                    const textChannel = await guild.channels.create({
+                        name: groupName,
+                        type: ChannelType.GuildText,
+                        parent: CHANNELS.TEXT_CATEGORY,
+                        permissionOverwrites: [
+                            { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                            { id: targetOwner.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                        ]
+                    });
+
+                    const voiceChannel = await guild.channels.create({
+                        name: groupName,
+                        type: ChannelType.GuildVoice,
+                        parent: CHANNELS.VOICE_CATEGORY,
+                        permissionOverwrites: [
+                            { id: guild.id, deny: [PermissionFlagsBits.Connect] },
+                            { id: targetOwner.id, allow: [PermissionFlagsBits.Connect] }
+                        ]
+                    });
+
+                    groupsObj[groupKey] = {
+                        name: groupName,
+                        leaderId: targetOwner.id,
+                        members: [],
+                        xp: 0,
+                        textCount: 0,
+                        textChannelId: textChannel.id,
+                        voiceChannelId: voiceChannel.id,
+                        createdAt: Date.now(),
+                        warningDeadline: Date.now() + (3 * 24 * 60 * 60 * 1000)
+                    };
+                    saveDb();
+
+                    await message.channel.send({ content: `تم إنشاء القروب بنجاح! يجب اكتمال 5 أعضاء خلال 3 أيام وإلا سيتم حذف القروب تلقائياً.` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
+                } catch (err) {
+                    console.error(err);
+                }
+            });
+        });
+        return;
+    }
+
     let groupsObj = db.groups.groups || db.groups;
-    let userGroup = Object.values(groupsObj).find(g => g.leaderId === message.author.id || (g.members && g.members.includes(message.author.id)));
+    let userGroupKey = Object.keys(groupsObj).find(k => groupsObj[k].leaderId === message.author.id || (groupsObj[k].members && groupsObj[k].members.includes(message.author.id)));
     
-    if (userGroup) {
+    if (userGroupKey) {
+        let userGroup = groupsObj[userGroupKey];
         const wordsCount = message.content.trim().split(/\s+/).length;
         const earnedXp = wordsCount * 2;
         userGroup.xp = (userGroup.xp || 0) + earnedXp;
         userGroup.textCount = (userGroup.textCount || 0) + wordsCount;
+
+        if (userGroup.xp >= 5000) {
+            let increments = Math.floor(userGroup.xp / 5000);
+            userGroup.xp += increments * 1000;
+            userGroup.xp = userGroup.xp % 5000;
+        }
         saveDb();
     }
 });
 
+setInterval(async () => {
+    loadDb();
+    let groupsObj = db.groups.groups || db.groups;
+    let now = Date.now();
+    let modified = false;
+
+    for (let key in groupsObj) {
+        let g = groupsObj[key];
+        let totalMembers = (g.members ? g.members.length : 0) + 1;
+        if (totalMembers < 5) {
+            if (g.warningDeadline && now > g.warningDeadline) {
+                try {
+                    let guild = client.guilds.cache.first();
+                    if (guild) {
+                        let tChan = guild.channels.cache.get(g.textChannelId);
+                        let vChan = guild.channels.cache.get(g.voiceChannelId);
+                        if (tChan) await tChan.delete().catch(() => {});
+                        if (vChan) await vChan.delete().catch(() => {});
+                    }
+                } catch (e) {}
+                delete groupsObj[key];
+                modified = true;
+            }
+        } else {
+            g.warningDeadline = null;
+            modified = true;
+        }
+    }
+    if (modified) saveDb();
+}, 60000);
+
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+    if (!interaction.isStringSelectMenu()) return;
+    if (interaction.customId !== 'leader_select_menu') return;
 
     const guild = interaction.guild;
     const member = interaction.member;
@@ -106,14 +275,14 @@ client.on('interactionCreate', async (interaction) => {
     let myGroup = myGroupKey ? groupsObj[myGroupKey] : null;
     let isLeader = myGroup && myGroup.leaderId === userId;
 
-    const customId = interaction.customId;
+    const selectedValue = interaction.values[0];
 
-    if (customId === 'btn_role_color') {
+    if (selectedValue === 'btn_role_color') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
         return interaction.reply({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
     }
 
-    if (customId === 'btn_edit_role') {
+    if (selectedValue === 'btn_edit_role') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
         await interaction.reply({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
 
@@ -124,52 +293,47 @@ client.on('interactionCreate', async (interaction) => {
             await msg.delete().catch(() => {});
             const newName = msg.content;
             myGroup.name = newName;
+            
+            try {
+                let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                if (tChan) await tChan.setName(newName).catch(()=>{});
+                if (vChan) await vChan.setName(newName).catch(()=>{});
+            } catch (e) {}
+
             saveDb();
             await interaction.editReply({ content: `تم تحديث اسم القروب إلى: **${newName}**` }).catch(() => {});
         });
     }
 
-    if (customId === 'btn_invite_member') {
+    if (selectedValue === 'btn_invite_member') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
-        await interaction.reply({ content: 'منشن العضو أو اكتب يوزره لدعوته:', ephemeral: true });
+        await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم (يمكنك منشن أكثر من عضو):', ephemeral: true });
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
 
         collector.on('collect', async (msg) => {
             await msg.delete().catch(() => {});
-            const targetMember = msg.mentions.members.first() || guild.members.cache.find(m => m.user.tag === msg.content || m.id === msg.content);
-            if (!targetMember) return interaction.followUp({ content: 'لم يتم العثور على العضو.', ephemeral: true });
+            const targetMembers = msg.mentions.members;
+            if (!targetMembers || targetMembers.size === 0) return interaction.followUp({ content: 'لم يتم العثور على أعضاء.', ephemeral: true });
 
             const inviteRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`accept_invite_${myGroupKey}`).setLabel('قبول').setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId(`decline_invite_${myGroupKey}`).setLabel('رفض').setStyle(ButtonStyle.Danger)
             );
 
-            try {
-                await targetMember.send({ content: `دعوك للانضمام لقروبة (${myGroup.name})`, components: [inviteRow] });
-                await interaction.followUp({ content: 'تم إرسال الدعوة بنجاح.', ephemeral: true });
-            } catch (e) {
-                await interaction.followUp({ content: 'تعذر إرسال الخاصة للعضو.', ephemeral: true });
-            }
+            targetMembers.forEach(async (targetMember) => {
+                try {
+                    await targetMember.send({ content: `دعوك للانضمام لقروب (${myGroup.name})`, components: [inviteRow] });
+                } catch (e) {}
+            });
+
+            await interaction.followUp({ content: 'تم إرسال الدعوات بنجاح.', ephemeral: true });
         });
     }
 
-    if (customId.startsWith('accept_invite_')) {
-        const gKey = customId.replace('accept_invite_', '');
-        const targetGroup = groupsObj[gKey];
-        if (targetGroup) {
-            if (!targetGroup.members.includes(userId)) targetGroup.members.push(userId);
-            saveDb();
-        }
-        return interaction.update({ content: 'تم انضمامك للقروب بنجاح!', components: [] });
-    }
-
-    if (customId.startsWith('decline_invite_')) {
-        return interaction.update({ content: 'تم رفض الدعوة.', components: [] });
-    }
-
-    if (customId === 'btn_kick_member') {
+    if (selectedValue === 'btn_kick_member') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
         await interaction.reply({ content: 'منشن الأعضاء المراد طردهم:', ephemeral: true });
 
@@ -182,12 +346,22 @@ client.on('interactionCreate', async (interaction) => {
             kicked.forEach(km => {
                 myGroup.members = myGroup.members.filter(id => id !== km.id);
             });
+            
+            try {
+                let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                kicked.forEach(async km => {
+                    if (tChan) await tChan.permissionOverwrites.delete(km.id).catch(()=>{});
+                    if (vChan) await vChan.permissionOverwrites.delete(km.id).catch(()=>{});
+                });
+            } catch (e) {}
+
             saveDb();
             await interaction.followUp({ content: 'تم طرد الأعضاء المحددين بنجاح.', ephemeral: true });
         });
     }
 
-    if (customId === 'btn_my_stats') {
+    if (selectedValue === 'btn_my_stats') {
         if (!myGroup) return interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
         const stats = `
 -1- أعضاء القروب: ${(myGroup.members ? myGroup.members.length : 0) + 1}
@@ -197,17 +371,63 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: stats, ephemeral: true });
     }
 
-    if (customId === 'btn_leave_group') {
+    if (selectedValue === 'btn_leave_group') {
         if (!myGroup) return interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
         if (isLeader) {
+            try {
+                let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                if (tChan) await tChan.delete().catch(() => {});
+                if (vChan) await vChan.delete().catch(() => {});
+            } catch (e) {}
+
             delete groupsObj[myGroupKey];
             saveDb();
             return interaction.reply({ content: 'تم حذف القروب بنجاح.', ephemeral: true });
         } else {
             myGroup.members = myGroup.members.filter(id => id !== userId);
+            try {
+                let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                if (tChan) await tChan.permissionOverwrites.delete(userId).catch(()=>{});
+                if (vChan) await vChan.permissionOverwrites.delete(userId).catch(()=>{});
+            } catch (e) {}
+
             saveDb();
             return interaction.reply({ content: 'تم خروجك من القروب.', ephemeral: true });
         }
+    }
+});
+
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton()) return;
+    const customId = interaction.customId;
+    const userId = interaction.user.id;
+    const guild = interaction.guild;
+
+    let groupsObj = db.groups.groups || db.groups;
+
+    if (customId.startsWith('accept_invite_')) {
+        const gKey = customId.replace('accept_invite_', '');
+        const targetGroup = groupsObj[gKey];
+        if (targetGroup) {
+            if (!targetGroup.members.includes(userId) && targetGroup.leaderId !== userId) {
+                targetGroup.members.push(userId);
+                saveDb();
+
+                try {
+                    let tChan = guild.channels.cache.get(targetGroup.textChannelId);
+                    let vChan = guild.channels.cache.get(targetGroup.voiceChannelId);
+                    if (tChan) await tChan.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true }).catch(()=>{});
+                    if (vChan) await vChan.permissionOverwrites.create(userId, { Connect: true }).catch(()=>{});
+                } catch (e) {}
+            }
+        }
+        return interaction.update({ content: 'تم انضمامك للقروب بنجاح!', components: [] });
+    }
+
+    if (customId.startsWith('decline_invite_')) {
+        return interaction.update({ content: 'تم رفض الدعوة.', components: [] });
     }
 });
 
