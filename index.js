@@ -45,17 +45,35 @@ function loadDb() {
     if (fs.existsSync(DB_FILE)) {
         try { 
             const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-            if (data.groups) {
-                db.groups = data.groups;
-            } else {
-                db.groups = data;
-            }
+            db.groups = data.groups || data;
         } catch (e) { db = { groups: {} }; }
     }
 }
 
 function saveDb() {
     fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4));
+}
+
+// دالة ذكية للبحث عن قروب العضو سواء عبر الليدر أو امتلاك الرول يدوياً
+function getGroupsForUser(member) {
+    if (!member) return [];
+    return Object.keys(db.groups).filter(k => {
+        let g = db.groups[k];
+        let hasRole = member.roles.cache.has(g.roleId);
+        let isLeader = g.leaderId === member.id;
+        let isMember = g.members && g.members.includes(member.id);
+        return isLeader || hasRole || isMember;
+    });
+}
+
+function getLeaderOrOwnedGroups(member) {
+    if (!member) return [];
+    return Object.keys(db.groups).filter(k => {
+        let g = db.groups[k];
+        let hasRole = member.roles.cache.has(g.roleId);
+        let isLeader = g.leaderId === member.id;
+        return isLeader || hasRole;
+    });
 }
 
 async function generateTopBoardImage(sortedGroups) {
@@ -289,13 +307,14 @@ async function updateTopGroupsBoard() {
 
         await channel.send({ files: [attachment] });
     } catch (e) {
-        console.error(e);
+        console.error('Error updating top board:', e);
     }
 }
 
 client.on('ready', () => {
     loadDb();
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
+    updateTopGroupsBoard();
 });
 
 client.on('messageCreate', async (message) => {
@@ -310,26 +329,34 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ content: 'منشن ليدر القروب المراد حذفه.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         }
 
-        let foundKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === targetMember.id);
-        if (!foundKey) {
-            return message.channel.send({ content: 'هذا الشخص ليس لديه قروب.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+        let userGroups = getLeaderOrOwnedGroups(targetMember);
+        if (userGroups.length === 0) {
+            // محاولة ثانية: البحث بالرول أو الـ ID مباشرة في قاعدة البيانات
+            let foundKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === targetMember.id || targetMember.roles.cache.has(db.groups[k].roleId));
+            if (!foundKey) {
+                return message.channel.send({ content: 'هذا الشخص ليس لديه قروب.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            }
+            userGroups = [foundKey];
         }
 
-        let myGroup = db.groups[foundKey];
-        try {
-            let guild = message.guild;
-            let tChan = guild.channels.cache.get(myGroup.textChannelId);
-            let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
-            let role = guild.roles.cache.get(myGroup.roleId);
-            if (tChan) await tChan.delete().catch(() => {});
-            if (vChan) await vChan.delete().catch(() => {});
-            if (role) await role.delete().catch(() => {});
-        } catch (e) {}
+        for (const gKey of userGroups) {
+            let myGroup = db.groups[gKey];
+            try {
+                let guild = message.guild;
+                let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                let role = guild.roles.cache.get(myGroup.roleId);
+                if (tChan) await tChan.delete().catch(() => {});
+                if (vChan) await vChan.delete().catch(() => {});
+                if (role) await role.delete().catch(() => {});
+            } catch (e) {}
 
-        delete db.groups[foundKey];
+            delete db.groups[gKey];
+        }
+
         saveDb();
         await updateTopGroupsBoard();
-        await message.channel.send({ content: 'تم حذف القروب بنجاح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+        await message.channel.send({ content: 'تم حذف قروبات الشخص بنجاح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         return;
     }
 
@@ -345,7 +372,7 @@ client.on('messageCreate', async (message) => {
                 .setTitle('Leader Panel')
                 .setDescription('هنا يقدر ليدر القروب يتحكم بقروحه بشكل سريع ومنظم.')
                 .setColor('#2b2d31')
-                .setThumbnail('https://cdn.discordapp.com/attachments/1531644529818472458/1536192486597197824/A2CE557C-489A-468B-826F-8076DE214463.png?ex=6a7a823d&is=6a7930bd&hm=f3847c68a29e21539c5c2b84af48a5255a970a72bc9aa970732f9ac8e330ff11&');
+                .setThumbnail('https://cdn.discordapp.com/attachments/1531644529818472458/1536192486597197824/A2CE557C-489A-468B-826F-8076DE214463.png');
 
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('leader_select_menu')
@@ -389,9 +416,10 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send({ content: 'لم تقم بمنشن أي عضو صحيح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
-            let existingGroupsCount = Object.values(db.groups).filter(g => g.leaderId === targetOwner.id || (g.members && g.members.includes(targetOwner.id))).length;
-            if (existingGroupsCount >= 2) {
-                return message.channel.send({ content: 'هذا الشخص معه جروبين لازم يحذفه عشان يقدر يدخل' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            let existingGroups = getLeaderOrOwnedGroups(targetOwner);
+            if (existingGroups.length >= 2) {
+                await message.react('❌').catch(() => {});
+                return message.channel.send({ content: 'عذرا هذا الشخص عنده جروبين من قبل.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
             const namePrompt = await message.channel.send({ content: 'اكتب اسم الجروب:' });
@@ -482,7 +510,7 @@ client.on('messageCreate', async (message) => {
             let g = db.groups[k];
             return g.textChannelId === message.channel.id || 
                    g.leaderId === message.author.id || 
-                   (g.members && g.members.includes(message.author.id)) ||
+                   message.member.roles.cache.has(g.roleId) ||
                    (g.name && message.channel.name && g.name.toLowerCase() === message.channel.name.toLowerCase());
         });
         
@@ -507,9 +535,10 @@ client.on('interactionCreate', async (interaction) => {
     const member = interaction.member;
     const userId = member.id;
 
-    let myGroupKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === userId || (db.groups[k].members && db.groups[k].members.includes(userId)));
+    let userOwnedGroups = getLeaderOrOwnedGroups(member);
+    let myGroupKey = userOwnedGroups[0] || getGroupsForUser(member)[0];
     let myGroup = myGroupKey ? db.groups[myGroupKey] : null;
-    let isLeader = myGroup && myGroup.leaderId === userId;
+    let isLeader = myGroup && (myGroup.leaderId === userId || member.roles.cache.has(myGroup.roleId));
 
     const selectedValue = interaction.values[0];
 
@@ -661,9 +690,9 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             for (const [targetId, targetMember] of targetMembers) {
-                let existingGroupsCount = Object.values(db.groups).filter(g => g.leaderId === targetId || (g.members && g.members.includes(targetId))).length;
+                let existingGroupsCount = getLeaderOrOwnedGroups(targetMember).length;
                 if (existingGroupsCount >= 2) {
-                    const failMsg = await interaction.followUp({ content: 'هذا الشخص داخل جروبين', ephemeral: true });
+                    const failMsg = await interaction.followUp({ content: 'هذا الشخص داخل جروبين أو لديه قروبات كاملة.', ephemeral: true });
                     setTimeout(() => failMsg.delete().catch(() => {}), 5000);
                     continue;
                 }
@@ -709,11 +738,8 @@ client.on('interactionCreate', async (interaction) => {
             const targetMember = msg.mentions.members.first() || guild.members.cache.find(m => m.user.username === msg.content.trim() || m.user.tag === msg.content.trim() || m.id === msg.content.trim());
 
             if (!targetMember) {
-                const errorMsg = await interaction.user.send({ content: 'المينشن واليوزر غير صحيح' }).catch(() => null);
-                if (!errorMsg) {
-                    const fallbackMsg = await interaction.channel.send({ content: `<@${userId}> المينشن واليوزر غير صحيح` });
-                    setTimeout(() => fallbackMsg.delete().catch(() => {}), 5000);
-                }
+                const fallbackMsg = await interaction.channel.send({ content: `<@${userId}> المينشن واليوزر غير صحيح` });
+                setTimeout(() => fallbackMsg.delete().catch(() => {}), 5000);
                 return;
             }
 
@@ -814,7 +840,7 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.update({ content: 'تم انضمامك للقروب بنجاح!', components: [] });
     }
 
-    if (customId.startsWith('default_invite_') || customId.startsWith('decline_invite_')) {
+    if (customId.startsWith('decline_invite_')) {
         return interaction.update({ content: 'تم رفض الدعوة.', components: [] });
     }
 });
