@@ -8,10 +8,7 @@ const {
     StringSelectMenuBuilder,
     ChannelType,
     PermissionFlagsBits,
-    AttachmentBuilder,
-    ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle
+    AttachmentBuilder
 } = require('discord.js');
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
@@ -71,7 +68,6 @@ async function generateTopBoardImage(sortedGroups) {
     const canvas = createCanvas(1200, 675);
     const ctx = canvas.getContext('2d');
 
-    // الخلفية الزرقاء الفخمة المتناسقة مع التصميم المطلوب
     const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
     bgGradient.addColorStop(0, '#0d1b2a');
     bgGradient.addColorStop(0.5, '#1b263b');
@@ -115,7 +111,7 @@ async function generateTopBoardImage(sortedGroups) {
     let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     drawStatBox(865, 35, 145, 65, 'UPDATED', dateStr);
 
-    // بطاقة المركز الأول (Champion)
+    // بطاقة المركز الأول
     ctx.fillStyle = 'rgba(41, 65, 104, 0.25)';
     ctx.strokeStyle = 'rgba(119, 141, 169, 0.4)';
     ctx.lineWidth = 2;
@@ -134,6 +130,7 @@ async function generateTopBoardImage(sortedGroups) {
 
     let topGroup = sortedGroups[0];
     if (topGroup) {
+        // رسم الأفاتار بشكل دائري صحيح وصحيح المقاسات
         ctx.save();
         ctx.beginPath();
         ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
@@ -182,11 +179,6 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.fillText('0', 290, 395);
 
         ctx.fillStyle = '#1b263b';
-        ctx.beginPath();
-        ctx.roundRect(65, 465, 370, 6, 3);
-        ctx.fill();
-
-        ctx.fillStyle = '#778da9';
         ctx.beginPath();
         ctx.roundRect(65, 465, 370, 6, 3);
         ctx.fill();
@@ -253,7 +245,6 @@ async function generateTopBoardImage(sortedGroups) {
             ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
             ctx.stroke();
 
-            // اسم القروب بدلاً من يوزر
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 15px sans-serif';
             ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 50);
@@ -319,7 +310,7 @@ async function updateTopGroupsBoard() {
     }
 }
 
-client.on('ready', () => {
+client.once('ready', () => {
     loadDb();
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
     updateTopGroupsBoard();
@@ -479,7 +470,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // احتساب الـ XP فقط للرومات الكتابية الخاصة بالقروبات (ولا يحتسب للرومات الصوتية)
+    // احتساب الـ XP فقط للرومات الكتابية الخاصة بالقروبات
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
@@ -509,7 +500,6 @@ client.on('interactionCreate', async (interaction) => {
 
     const guild = interaction.guild;
     const member = interaction.member;
-    const userId = member.id;
 
     let userOwnedGroups = getLeaderOrOwnedGroups(member);
     let myGroupKey = userOwnedGroups[0];
