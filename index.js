@@ -472,7 +472,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // --- الحل الجذري لاحتساب الـ XP وربط الشات ---
+    // --- هذا هو الجزء الأساسي لاحتساب الـ XP وربط الشات تلقائياً ---
     if (message.channel.type === ChannelType.GuildText) {
         let userGroupKey = Object.keys(db.groups).find(k => {
             let g = db.groups[k];
@@ -507,7 +507,6 @@ client.on('interactionCreate', async (interaction) => {
     let userOwnedGroups = getLeaderOrOwnedGroups(member);
     let myGroupKey = userOwnedGroups[0];
     let myGroup = myGroupKey ? db.groups[myGroupKey] : null;
-    let isLeader = myGroup && (myGroup.leaderId === userId || member.roles.cache.has(myGroup.roleId));
 
     const selectedValue = interaction.values[0];
 
