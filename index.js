@@ -96,8 +96,11 @@ client.on('ready', () => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
+    // تحقق من امتلاك الرول المطلوب (أو الآيدي المخصص)
+    const hasAllowedRole = message.member.roles.cache.has(ALLOWED_CREATOR_ID) || message.author.id === ALLOWED_CREATOR_ID;
+
     if (message.content === '!setup') {
-        if (message.author.id !== ALLOWED_CREATOR_ID || message.channel.id !== CHANNELS.LEADER_PANEL) {
+        if (!hasAllowedRole || message.channel.id !== CHANNELS.LEADER_PANEL) {
             await message.react('❌').catch(() => {});
             return;
         }
@@ -132,7 +135,7 @@ client.on('messageCreate', async (message) => {
     }
 
     if (message.content.toLowerCase() === 'crator group') {
-        if (message.author.id !== ALLOWED_CREATOR_ID) {
+        if (!hasAllowedRole) {
             await message.react('❌').catch(() => {});
             return;
         }
@@ -158,7 +161,7 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send({ content: 'هذا الشخص لديه قروب مسبقاً.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
-            const namePrompt = await message.channel.send({ content: 'ما هو اسم القروب؟' });
+            const namePrompt = await message.channel.send({ content: 'اكتب اسم الجروب:' });
             const nameCollector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
 
             nameCollector.on('collect', async (nameMsg) => {
@@ -170,6 +173,8 @@ client.on('messageCreate', async (message) => {
 
                 try {
                     const guild = message.guild;
+                    
+                    // 1. الروم الكتابي: بالآيدي المخصص للشانل، لا يراه ولا يتكلم فيه إلا أعضاء الجروب
                     const textChannel = await guild.channels.create({
                         name: groupName,
                         type: ChannelType.GuildText,
@@ -180,6 +185,7 @@ client.on('messageCreate', async (message) => {
                         ]
                     });
 
+                    // 2. الروم الصوتي: بالآيدي المخصص للشانل، يراه الجميع ولكن لا يدخله ولا يتكلم فيه إلا أعضاء الجروب
                     const voiceChannel = await guild.channels.create({
                         name: groupName,
                         type: ChannelType.GuildVoice,
@@ -203,7 +209,7 @@ client.on('messageCreate', async (message) => {
                     };
                     saveDb();
 
-                    await message.channel.send({ content: `تم إنشاء القروب بنجاح! يجب اكتمال 5 أعضاء خلال 3 أيام وإلا سيتم حذف القروب تلقائياً.` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
+                    await message.channel.send({ content: `تم إنشاء القروب (كتابي وصوتي) بنجاح للأونر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
                     console.error(err);
                 }
@@ -278,12 +284,12 @@ client.on('interactionCreate', async (interaction) => {
     const selectedValue = interaction.values[0];
 
     if (selectedValue === 'btn_role_color') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
         return interaction.reply({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
     }
 
     if (selectedValue === 'btn_edit_role') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
         await interaction.reply({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
@@ -307,8 +313,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_invite_member') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
-        await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم (يمكنك منشن أكثر من عضو):', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
+        await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
@@ -334,7 +340,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_kick_member') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
         await interaction.reply({ content: 'منشن الأعضاء المراد طردهم:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
