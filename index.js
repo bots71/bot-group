@@ -53,6 +53,7 @@ function loadDb() {
         } catch (e) { db = { groups: {} }; }
     }
 }
+
 function saveDb() {
     fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4));
 }
@@ -295,7 +296,6 @@ async function updateTopGroupsBoard() {
 client.on('ready', () => {
     loadDb();
     console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
-    setInterval(updateTopGroupsBoard, 30000);
 });
 
 client.on('messageCreate', async (message) => {
@@ -328,6 +328,7 @@ client.on('messageCreate', async (message) => {
 
         delete db.groups[foundKey];
         saveDb();
+        await updateTopGroupsBoard();
         await message.channel.send({ content: 'تم حذف القروب بنجاح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         return;
     }
@@ -465,6 +466,7 @@ client.on('messageCreate', async (message) => {
                         createdAt: Date.now()
                     };
                     saveDb();
+                    await updateTopGroupsBoard();
 
                     await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
@@ -476,13 +478,14 @@ client.on('messageCreate', async (message) => {
     }
 
     if (message.channel.type === ChannelType.GuildText) {
-        let userGroupKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === message.author.id || (db.groups[k].members && db.groups[k].members.includes(message.author.id)));
+        let userGroupKey = Object.keys(db.groups).find(k => db.groups[k].textChannelId === message.channel.id || db.groups[k].leaderId === message.author.id || (db.groups[k].members && db.groups[k].members.includes(message.author.id)));
         
         if (userGroupKey) {
             let userGroup = db.groups[userGroupKey];
             userGroup.xp = (userGroup.xp || 0) + 2;
             userGroup.textCount = (userGroup.textCount || 0) + 1;
             saveDb();
+            await updateTopGroupsBoard();
         }
     }
 });
@@ -612,6 +615,7 @@ client.on('interactionCreate', async (interaction) => {
             } catch (e) {}
 
             saveDb();
+            await updateTopGroupsBoard();
             const successMsg = await interaction.channel.send({ content: `تم تحديث اسم القروب إلى: **${newName}**` }).catch(() => {});
             if (successMsg) setTimeout(() => successMsg.delete().catch(() => {}), 5000);
         });
@@ -713,6 +717,7 @@ client.on('interactionCreate', async (interaction) => {
             } catch (e) {}
 
             saveDb();
+            await updateTopGroupsBoard();
             const successMsg = await interaction.channel.send({ content: 'تم طرد العضو المحدد بنجاح.' });
             setTimeout(() => successMsg.delete().catch(() => {}), 5000);
         });
@@ -752,6 +757,7 @@ client.on('interactionCreate', async (interaction) => {
 
             delete db.groups[myGroupKey];
             saveDb();
+            await updateTopGroupsBoard();
             const replyMsg = await interaction.followUp({ content: 'تم حذف القروب بنجاح.', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
@@ -765,6 +771,7 @@ client.on('interactionCreate', async (interaction) => {
             } catch (e) {}
 
             saveDb();
+            await updateTopGroupsBoard();
             const replyMsg = await interaction.followUp({ content: 'تم خروجك من القروب.', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
@@ -785,6 +792,7 @@ client.on('interactionCreate', async (interaction) => {
             if (!targetGroup.members.includes(userId) && targetGroup.leaderId !== userId) {
                 targetGroup.members.push(userId);
                 saveDb();
+                await updateTopGroupsBoard();
 
                 try {
                     let memberObj = await guild.members.fetch(userId).catch(() => null);
