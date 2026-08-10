@@ -58,15 +58,8 @@ async function updateTopGroupsBoard() {
         let groupsObj = db.groups.groups || db.groups;
         let sortedGroups = Object.entries(groupsObj).sort((a, b) => (b[1].xp || 0) - (a[1].xp || 0)).slice(0, 7);
 
-        let description = sortedGroups.length === 0 ? "لا توجد قروبات نشطة حالياً." : sortedGroups.map((g, index) => {
-            let data = g[1];
-            let membersCount = (data.members ? data.members.length : 0) + 1;
-            return `**${index + 1} | ${data.name}**\n- الأعضاء: ${membersCount}\n- الكلمات: ${data.textCount || 0}\n- الأكس بي: ${data.xp || 0}\n`;
-        }).join('\n');
-
         const embed = new EmbedBuilder()
             .setTitle('Top 7 Groups')
-            .setDescription(description)
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
 
@@ -96,7 +89,6 @@ client.on('ready', () => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
-    // تحقق من امتلاك الرول المطلوب (أو الآيدي المخصص)
     const hasAllowedRole = message.member.roles.cache.has(ALLOWED_CREATOR_ID) || message.author.id === ALLOWED_CREATOR_ID;
 
     if (message.content === '!setup') {
@@ -117,12 +109,12 @@ client.on('messageCreate', async (message) => {
                 .setCustomId('leader_select_menu')
                 .setPlaceholder('Choose a leader action')
                 .addOptions([
-                    { label: 'Role Color', description: 'تغيير لون رول القروب', value: 'btn_role_color', emoji: '🎨' },
-                    { label: 'Edit Role', description: 'تعديل اسم رول القروب', value: 'btn_edit_role', emoji: '✏️' },
-                    { label: 'Invite Member', description: 'دعوة عضو أو أكثر للقروب', value: 'btn_invite_member', emoji: '✉️' },
-                    { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member', emoji: '👢' },
-                    { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats', emoji: '📊' },
-                    { label: 'Leave Group', description: 'الخروج أو حذف القروب', value: 'btn_leave_group', emoji: '🚪' }
+                    { label: 'Role Color', description: 'تغيير لون رول القروب', value: 'btn_role_color' },
+                    { label: 'Edit Role', description: 'تعديل اسم رول القروب', value: 'btn_edit_role' },
+                    { label: 'Invite Member', description: 'دعوة عضو أو أكثر للقروب', value: 'btn_invite_member' },
+                    { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member' },
+                    { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats' },
+                    { label: 'Leave Group', description: 'الخروج أو حذف القروب', value: 'btn_leave_group' }
                 ]);
 
             const row = new ActionRowBuilder().addComponents(selectMenu);
@@ -174,7 +166,6 @@ client.on('messageCreate', async (message) => {
                 try {
                     const guild = message.guild;
                     
-                    // 1. الروم الكتابي: بالآيدي المخصص للشانل، لا يراه ولا يتكلم فيه إلا أعضاء الجروب
                     const textChannel = await guild.channels.create({
                         name: groupName,
                         type: ChannelType.GuildText,
@@ -185,7 +176,6 @@ client.on('messageCreate', async (message) => {
                         ]
                     });
 
-                    // 2. الروم الصوتي: بالآيدي المخصص للشانل، يراه الجميع ولكن لا يدخله ولا يتكلم فيه إلا أعضاء الجروب
                     const voiceChannel = await guild.channels.create({
                         name: groupName,
                         type: ChannelType.GuildVoice,
@@ -199,6 +189,7 @@ client.on('messageCreate', async (message) => {
                     groupsObj[groupKey] = {
                         name: groupName,
                         leaderId: targetOwner.id,
+                        leaderAvatar: targetOwner.user.displayAvatarURL({ extension: 'png', size: 256 }),
                         members: [],
                         xp: 0,
                         textCount: 0,
@@ -209,7 +200,7 @@ client.on('messageCreate', async (message) => {
                     };
                     saveDb();
 
-                    await message.channel.send({ content: `تم إنشاء القروب (كتابي وصوتي) بنجاح للأونر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
+                    await message.channel.send({ content: `تم إنشاء القروب بنجاح للأونر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
                     console.error(err);
                 }
@@ -284,12 +275,12 @@ client.on('interactionCreate', async (interaction) => {
     const selectedValue = interaction.values[0];
 
     if (selectedValue === 'btn_role_color') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
         return interaction.reply({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
     }
 
     if (selectedValue === 'btn_edit_role') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
         await interaction.reply({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
@@ -313,7 +304,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_invite_member') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
         await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
@@ -340,7 +331,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_kick_member') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الزر للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
         await interaction.reply({ content: 'منشن الأعضاء المراد طردهم:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
