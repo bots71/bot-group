@@ -56,12 +56,13 @@ async function updateTopGroupsBoard() {
         let groupsObj = db.groups.groups || db.groups;
         let sortedGroups = Object.entries(groupsObj).sort((a, b) => (b[1].xp || 0) - (a[1].xp || 0)).slice(0, 7);
 
+        const topGroup = sortedGroups[0] ? sortedGroups[0][1] : null;
+
         const embed = new EmbedBuilder()
             .setTitle('Top 7 Groups')
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
 
-        let topGroup = sortedGroups[0] ? sortedGroups[0][1] : null;
         if (topGroup) {
             embed.setThumbnail(topGroup.leaderAvatar || null);
         }
@@ -159,9 +160,9 @@ client.on('messageCreate', async (message) => {
             }
 
             let groupsObj = db.groups.groups || db.groups;
-            let existing = Object.values(groupsObj).find(g => g.leaderId === targetOwner.id);
-            if (existing) {
-                return message.channel.send({ content: 'هذا الشخص لديه قروب مسبقاً.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            let existingUserCheck = Object.values(groupsObj).find(g => g.leaderId === targetOwner.id || (g.members && g.members.includes(targetOwner.id)));
+            if (existingUserCheck) {
+                return message.channel.send({ content: 'هذا الشخص لديك جروب من قبل لا تستطيع' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
             const namePrompt = await message.channel.send({ content: 'اكتب اسم الجروب:' });
@@ -297,7 +298,7 @@ setInterval(async () => {
         }
     }
     if (modified) saveDb();
-}, 60000);
+}, 30000);
 
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isStringSelectMenu()) return;
@@ -330,14 +331,52 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.update({ components: [row] }).catch(() => {});
 
     if (selectedValue === 'btn_role_color') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+        if (!isLeader) {
+            const replyMsg = await interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
+            return;
+        }
+        
+        try {
+            await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
+        } catch (e) {}
+
         const replyMsg = await interaction.followUp({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
-        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
+        setTimeout(() => replyMsg.delete().catch(() => {}), 5000);
+
+        const colorRoomChannel = guild.channels.cache.get(CHANNELS.COLOR_ROOM);
+        if (colorRoomChannel) {
+            const colorFilter = m => m.author.id === userId && m.member.roles.cache.size > member.roles.cache.size;
+            const colorCollector = colorRoomChannel.createMessageCollector({ time: 30000 });
+
+            colorCollector.on('collect', async (colorMsg) => {
+                const newRole = colorMsg.member.roles.cache.find(r => !member.roles.cache.has(r.id));
+                if (newRole && myGroup && myGroup.roleId) {
+                    try {
+                        const groupRole = guild.roles.cache.get(myGroup.roleId);
+                        if (groupRole) {
+                            await groupRole.setColor(newRole.color).catch(() => {});
+                        }
+                    } catch (e) {}
+                }
+                colorCollector.stop();
+            });
+        }
+
+        setTimeout(async () => {
+            try {
+                await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: null });
+            } catch (e) {}
+        }, 15000);
         return;
     }
 
     if (selectedValue === 'btn_edit_role') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+        if (!isLeader) {
+            const replyMsg = await interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
+            return;
+        }
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
@@ -390,7 +429,11 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_invite_member') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+        if (!isLeader) {
+            const replyMsg = await interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
+            return;
+        }
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
@@ -415,16 +458,23 @@ client.on('interactionCreate', async (interaction) => {
                 return;
             }
 
-            const inviteRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`accept_invite_${myGroupKey}`).setLabel('قبول').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`decline_invite_${myGroupKey}`).setLabel('رفض').setStyle(ButtonStyle.Danger)
-            );
+            for (const [targetId, targetMember] of targetMembers) {
+                let existingGroupCheck = Object.values(groupsObj).find(g => g.leaderId === targetId || (g.members && g.members.includes(targetId)));
+                if (existingGroupCheck) {
+                    const failMsg = await interaction.followUp({ content: 'العضو هذا داخل جروب ثاني', ephemeral: true });
+                    setTimeout(() => failMsg.delete().catch(() => {}), 5000);
+                    continue;
+                }
 
-            targetMembers.forEach(async (targetMember) => {
+                const inviteRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`accept_invite_${myGroupKey}`).setLabel('قبول').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`decline_invite_${myGroupKey}`).setLabel('رفض').setStyle(ButtonStyle.Danger)
+                );
+
                 try {
                     await targetMember.send({ content: `دعوك للانضمام لقروب (${myGroup.name})`, components: [inviteRow] });
                 } catch (e) {}
-            });
+            }
 
             const successMsg = await interaction.channel.send({ content: 'تم إرسال الدعوات بنجاح.' });
             setTimeout(() => successMsg.delete().catch(() => {}), 5000);
@@ -432,7 +482,11 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_kick_member') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+        if (!isLeader) {
+            const replyMsg = await interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
+            return;
+        }
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
