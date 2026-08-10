@@ -53,18 +53,9 @@ async function updateTopGroupsBoard() {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
         if (!channel) return;
 
-        let groupsObj = db.groups.groups || db.groups;
-        let sortedGroups = Object.entries(groupsObj).sort((a, b) => (b[1].xp || 0) - (a[1].xp || 0)).slice(0, 7);
-
-        const topGroup = sortedGroups[0] ? sortedGroups[0][1] : null;
-
         const embed = new EmbedBuilder()
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
-
-        if (topGroup) {
-            embed.setThumbnail(topGroup.leaderAvatar || null);
-        }
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
@@ -178,9 +169,9 @@ client.on('messageCreate', async (message) => {
             }
 
             let groupsObj = db.groups.groups || db.groups;
-            let existingUserCheck = Object.values(groupsObj).find(g => g.leaderId === targetOwner.id || (g.members && g.members.includes(targetOwner.id)));
-            if (existingUserCheck) {
-                return message.channel.send({ content: 'هذا الشخص معه جروب لازم يحذفه عشان يقدر يدخل' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            let existingGroupsCount = Object.values(groupsObj).filter(g => g.leaderId === targetOwner.id || (g.members && g.members.includes(targetOwner.id))).length;
+            if (existingGroupsCount >= 2) {
+                return message.channel.send({ content: 'هذا الشخص معه جروبين لازم يحذفه عشان يقدر يدخل' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
             const namePrompt = await message.channel.send({ content: 'اكتب اسم الجروب:' });
@@ -200,7 +191,7 @@ client.on('messageCreate', async (message) => {
                         break;
                     }
                 }
-                if (lowerName === '10 10' || lowerName === '10-10') {
+                if (lowerName === '10 10' || lowerName === '10-10' || lowerName === '999') {
                     isColorRoleName = true;
                 }
 
@@ -364,20 +355,23 @@ client.on('interactionCreate', async (interaction) => {
 
         const colorRoomChannel = guild.channels.cache.get(CHANNELS.COLOR_ROOM);
         if (colorRoomChannel) {
-            const colorFilter = m => m.author.id === userId && m.member.roles.cache.size > member.roles.cache.size;
-            const colorCollector = colorRoomChannel.createMessageCollector({ time: 30000 });
+            const colorFilter = m => m.author.id === userId;
+            const colorCollector = colorRoomChannel.createMessageCollector({ filter: colorFilter, time: 30000, max: 1 });
 
             colorCollector.on('collect', async (colorMsg) => {
-                const newRole = colorMsg.member.roles.cache.find(r => !member.roles.cache.has(r.id));
-                if (newRole && myGroup && myGroup.roleId) {
+                try {
+                    await colorMsg.delete().catch(() => {});
+                } catch (e) {}
+
+                let poRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'po' || r.name.toLowerCase() === 'بو');
+                if (poRole && myGroup && myGroup.roleId) {
                     try {
                         const groupRole = guild.roles.cache.get(myGroup.roleId);
                         if (groupRole) {
-                            await groupRole.setColor(newRole.color).catch(() => {});
+                            await groupRole.setColor(poRole.color).catch(() => {});
                         }
                     } catch (e) {}
                 }
-                colorCollector.stop();
             });
         }
 
@@ -418,7 +412,7 @@ client.on('interactionCreate', async (interaction) => {
                     break;
                 }
             }
-            if (lowerName === '10 10' || lowerName === '10-10') {
+            if (lowerName === '10 10' || lowerName === '10-10' || lowerName === '999') {
                 isColorRoleName = true;
             }
 
@@ -477,8 +471,8 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             for (const [targetId, targetMember] of targetMembers) {
-                let existingGroupCheck = Object.values(groupsObj).find(g => g.leaderId === targetId || (g.members && g.members.includes(targetId)));
-                if (existingGroupCheck) {
+                let existingGroupsCount = Object.values(groupsObj).filter(g => g.leaderId === targetId || (g.members && g.members.includes(targetId))).length;
+                if (existingGroupsCount >= 2) {
                     const failMsg = await interaction.followUp({ content: 'هذا الشخص داخل جروبين', ephemeral: true });
                     setTimeout(() => failMsg.delete().catch(() => {}), 5000);
                     continue;
