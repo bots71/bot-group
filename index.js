@@ -185,8 +185,8 @@ client.on('messageCreate', async (message) => {
                         type: ChannelType.GuildVoice,
                         parent: CHANNELS.VOICE_CATEGORY,
                         permissionOverwrites: [
-                            { id: guild.id, deny: [PermissionFlagsBits.Connect] },
-                            { id: targetOwner.id, allow: [PermissionFlagsBits.Connect] }
+                            { id: guild.id, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
+                            { id: targetOwner.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] }
                         ]
                     });
 
@@ -419,7 +419,7 @@ client.on('interactionCreate', async (interaction) => {
                     let tChan = guild.channels.cache.get(targetGroup.textChannelId);
                     let vChan = guild.channels.cache.get(targetGroup.voiceChannelId);
                     if (tChan) await tChan.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true }).catch(()=>{});
-                    if (vChan) await vChan.permissionOverwrites.create(userId, { Connect: true }).catch(()=>{});
+                    if (vChan) await vChan.permissionOverwrites.create(userId, { ViewChannel: true, Connect: true, Speak: true }).catch(()=>{});
                 } catch (e) {}
             }
         }
