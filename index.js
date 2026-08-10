@@ -7,8 +7,10 @@ const {
     EmbedBuilder,
     StringSelectMenuBuilder,
     ChannelType,
-    PermissionFlagsBits
+    PermissionFlagsBits,
+    AttachmentBuilder
 } = require('discord.js');
+const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const http = require('http');
 
@@ -48,6 +50,228 @@ function saveDb() {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 4));
 }
 
+async function generateTopBoardImage(sortedGroups) {
+    const canvas = createCanvas(1200, 675);
+    const ctx = canvas.getContext('2d');
+
+    // خلفية لوحة الترتيب الاحترافية
+    ctx.fillStyle = '#0b0f19';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // عنوان اللوحة والإحصائيات العامة
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText('MYTH', 120, 75);
+
+    ctx.fillStyle = '#8b9bb4';
+    ctx.font = '16px sans-serif';
+    ctx.fillText('Performance board / activity • voice • events', 120, 105);
+
+    let totalXpAll = sortedGroups.reduce((acc, g) => acc + (g.xp || 0), 0);
+
+    // مربعات الإحصائيات العلوية
+    function drawStatBox(x, y, w, h, title, val) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#8b9bb4';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(title, x + 20, y + 25);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 20px sans-serif';
+        ctx.fillText(val, x + 20, y + 52);
+    }
+
+    drawStatBox(520, 45, 95, 70, 'GROUPS', sortedGroups.length);
+    drawStatBox(630, 45, 120, 70, 'TOTAL XP', totalXpAll.toLocaleString());
+    drawStatBox(765, 45, 105, 70, 'EVENT WINS', '0');
+
+    let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    drawStatBox(885, 45, 150, 70, 'UPDATED', dateStr);
+
+    // المركز الأول (#1)
+    ctx.fillStyle = 'rgba(255, 180, 100, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 180, 100, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(45, 150, 410, 475, 16);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('#1', 75, 190);
+
+    ctx.fillStyle = '#8b9bb4';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('CURRENT CHAMPION', 115, 190);
+
+    let topGroup = sortedGroups[0];
+    if (topGroup) {
+        // رسم صورة الليدر أو القروب دائرية
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.clip();
+        try {
+            const avatarImg = await loadImage(topGroup.leaderAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png');
+            ctx.drawImage(avatarImg, 80, 240, 100, 100);
+        } catch (e) {
+            ctx.fillStyle = '#333';
+            ctx.fillRect(80, 240, 100, 100);
+        }
+        ctx.restore();
+
+        // إطار دائرى متوهج للمركز الأول
+        ctx.strokeStyle = '#ffb464';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(130, 290, 50, 0, Math.PI * 2, true);
+        ctx.stroke();
+
+        // اسم القروب واسم الليدر
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.fillText(topGroup.name || 'USER', 200, 280);
+
+        ctx.fillStyle = '#8b9bb4';
+        ctx.font = '14px sans-serif';
+        ctx.fillText(`Leader • ${topGroup.leaderName || 'user'}`, 200, 315);
+
+        // إحصائيات المركز الأول
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.beginPath();
+        ctx.roundRect(65, 375, 200, 65, 10);
+        ctx.roundRect(280, 375, 155, 65, 10);
+        ctx.fill();
+
+        ctx.fillStyle = '#8b9bb4';
+        ctx.font = '11px sans-serif';
+        ctx.fillText('TOTAL EXPERIENCE', 80, 400);
+        ctx.fillText('EVENT WINS', 295, 400);
+
+        ctx.fillStyle = '#ffb464';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.fillText((topGroup.xp || 0).toLocaleString(), 80, 430);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.fillText('0', 295, 430);
+
+        // شريط التقدم
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.roundRect(65, 495, 370, 8, 4);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffb464';
+        ctx.beginPath();
+        ctx.roundRect(65, 495, 370, 8, 4);
+        ctx.fill();
+
+        ctx.fillStyle = '#8b9bb4';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('Leading the board', 65, 535);
+        ctx.fillText('Defend the crown.', 320, 535);
+    }
+
+    // المراكز من #2 إلى #7
+    let cardPositions = [
+        { x: 480, y: 150 },
+        { x: 840, y: 150 },
+        { x: 480, y: 275 },
+        { x: 840, y: 275 },
+        { x: 480, y: 400 },
+        { x: 840, y: 400 }
+    ];
+
+    for (let i = 1; i <= 6; i++) {
+        let g = sortedGroups[i];
+        let pos = cardPositions[i - 1];
+        if (!pos) break;
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(pos.x, pos.y, 335, 105, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(`#${i + 1}`, pos.x + 20, pos.y + 28);
+
+        if (g) {
+            // صورة مصغرة دائرية
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.clip();
+            try {
+                let av = await loadImage(g.leaderAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png');
+                ctx.drawImage(av, pos.x + 30, pos.y + 45, 40, 40);
+            } catch (e) {
+                ctx.fillStyle = '#333';
+                ctx.fillRect(pos.x + 30, pos.y + 45, 40, 40);
+            }
+            ctx.restore();
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px sans-serif';
+            ctx.fillText(g.name || 'USER', pos.x + 85, pos.y + 55);
+
+            ctx.fillStyle = '#8b9bb4';
+            ctx.font = '12px sans-serif';
+            ctx.fillText(`Leader • ${g.leaderName || 'user'}`, pos.x + 85, pos.y + 78);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${(g.xp || 0).toLocaleString()} XP`, pos.x + 315, pos.y + 55);
+
+            ctx.fillStyle = '#8b9bb4';
+            ctx.font = '11px sans-serif';
+            ctx.fillText('0 WINS', pos.x + 315, pos.y + 78);
+            ctx.textAlign = 'left';
+        } else {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px sans-serif';
+            ctx.fillText('USER', pos.x + 85, pos.y + 55);
+
+            ctx.fillStyle = '#8b9bb4';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('Leader • user', pos.x + 85, pos.y + 78);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('0 XP', pos.x + 315, pos.y + 55);
+
+            ctx.fillStyle = '#8b9bb4';
+            ctx.font = '11px sans-serif';
+            ctx.fillText('0 WINS', pos.x + 315, pos.y + 78);
+            ctx.textAlign = 'left';
+        }
+    }
+
+    return canvas.toBuffer('image/png');
+}
+
 async function updateTopGroupsBoard() {
     try {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
@@ -56,14 +280,8 @@ async function updateTopGroupsBoard() {
         let groupsObj = db.groups.groups || db.groups;
         let sortedGroups = Object.values(groupsObj).sort((a, b) => (b.xp || 0) - (a.xp || 0));
 
-        const embed = new EmbedBuilder()
-            .setColor('#2b2d31')
-            .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
-
-        let descriptionLines = [];
-        sortedGroups.slice(0, 7).forEach((g, index) => {
-            descriptionLines.id = g.leaderId;
-        });
+        const buffer = await generateTopBoardImage(sortedGroups);
+        const attachment = new AttachmentBuilder(buffer, { name: 'top-groups.png' });
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
@@ -73,7 +291,7 @@ async function updateTopGroupsBoard() {
             }
         }
 
-        await channel.send({ embeds: [embed] });
+        await channel.send({ files: [attachment] });
     } catch (e) {
         console.error(e);
     }
@@ -244,6 +462,7 @@ client.on('messageCreate', async (message) => {
                         name: groupName,
                         roleId: groupRole.id,
                         leaderId: targetOwner.id,
+                        leaderName: targetOwner.user.username,
                         leaderAvatar: targetOwner.user.displayAvatarURL({ extension: 'png', size: 256 }),
                         members: [],
                         xp: 0,
@@ -272,12 +491,6 @@ client.on('messageCreate', async (message) => {
             const earnedXp = 2;
             userGroup.xp = (userGroup.xp || 0) + earnedXp;
             userGroup.textCount = (userGroup.textCount || 0) + 1;
-
-            if (userGroup.xp >= 5000) {
-                let increments = Math.floor(userGroup.xp / 5000);
-                userGroup.xp += increments * 1000;
-                userGroup.xp = userGroup.xp % 5000;
-            }
             saveDb();
         }
     }
