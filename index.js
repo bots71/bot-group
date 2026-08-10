@@ -53,9 +53,17 @@ async function updateTopGroupsBoard() {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
         if (!channel) return;
 
+        let groupsObj = db.groups.groups || db.groups;
+        let sortedGroups = Object.values(groupsObj).sort((a, b) => (b.xp || 0) - (a.xp || 0));
+
         const embed = new EmbedBuilder()
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
+
+        let descriptionLines = [];
+        sortedGroups.slice(0, 7).forEach((g, index) => {
+            descriptionLines.id = g.leaderId;
+        });
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
