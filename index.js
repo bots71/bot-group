@@ -61,6 +61,17 @@ async function updateTopGroupsBoard() {
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
 
+        let descText = "";
+        for (let i = 0; i < 7; i++) {
+            let g = sortedGroups[i] ? sortedGroups[i][1] : null;
+            let rankNum = i + 1;
+            let groupName = g ? g.name : "USER";
+            let groupXp = g ? (g.xp || 0) : 0;
+            let leaderName = g ? `<@${g.leaderId}>` : "user";
+            descText += `Rank #${rankNum}: **${groupName}** | XP: ${groupXp} | Leader: ${leaderName}\n`;
+        }
+        embed.setDescription(descText);
+
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
             const botMessages = messages.filter(m => m.author.id === client.user.id);
@@ -298,22 +309,37 @@ client.on('interactionCreate', async (interaction) => {
 
     const selectedValue = interaction.values[0];
 
+    const currentSelectMenu = new StringSelectMenuBuilder()
+        .setCustomId('leader_select_menu')
+        .setPlaceholder('Choose a leader action')
+        .addOptions([
+            { label: 'Role Color', description: 'تغيير لون رول القروب', value: 'btn_role_color' },
+            { label: 'Edit Role', description: 'تعديل اسم رول القروب', value: 'btn_edit_role' },
+            { label: 'Invite Member', description: 'دعوة عضو أو أكثر للقروب', value: 'btn_invite_member' },
+            { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member' },
+            { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats' },
+            { label: 'Leave Group', description: 'الخروج أو حذف القروب', value: 'btn_leave_group' }
+        ]);
+
+    const row = new ActionRowBuilder().addComponents(currentSelectMenu);
+    await interaction.update({ components: [row] }).catch(() => {});
+
     if (selectedValue === 'btn_role_color') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
-        await interaction.reply({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        const replyMsg = await interaction.followUp({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         return;
     }
 
     if (selectedValue === 'btn_edit_role') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
         } catch (e) {}
 
-        await interaction.reply({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        const replyMsg = await interaction.followUp({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 15000, max: 1 });
@@ -359,14 +385,14 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_invite_member') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
         } catch (e) {}
 
-        await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم:', ephemeral: true });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        const replyMsg = await interaction.followUp({ content: 'منشن الأعضاء المراد دعوتهم:', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
@@ -401,14 +427,14 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_kick_member') {
-        if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
         } catch (e) {}
 
-        await interaction.reply({ content: 'منشن العضو أو اكتب اليوزر المراد طرده:', ephemeral: true });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        const replyMsg = await interaction.followUp({ content: 'منشن العضو أو اكتب اليوزر المراد طرده:', ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
@@ -446,8 +472,8 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_my_stats') {
         if (!myGroup) {
-            await interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
-            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            const replyMsg = await interaction.followUp({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
         }
         const stats = `
@@ -455,15 +481,15 @@ client.on('interactionCreate', async (interaction) => {
 -2- كم كلمة باليوم: ${myGroup.textCount || 0}
 -3- كم اكس بي القروب: ${myGroup.xp || 0}
         `.trim();
-        await interaction.reply({ content: stats, ephemeral: true });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        const replyMsg = await interaction.followUp({ content: stats, ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         return;
     }
 
     if (selectedValue === 'btn_leave_group') {
         if (!myGroup) {
-            await interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
-            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            const replyMsg = await interaction.followUp({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
         }
         if (isLeader) {
@@ -478,8 +504,8 @@ client.on('interactionCreate', async (interaction) => {
 
             delete groupsObj[myGroupKey];
             saveDb();
-            await interaction.reply({ content: 'تم حذف القروب بنجاح.', ephemeral: true });
-            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            const replyMsg = await interaction.followUp({ content: 'تم حذف القروب بنجاح.', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
         } else {
             myGroup.members = myGroup.members.filter(id => id !== userId);
@@ -491,8 +517,8 @@ client.on('interactionCreate', async (interaction) => {
             } catch (e) {}
 
             saveDb();
-            await interaction.reply({ content: 'تم خروجك من القروب.', ephemeral: true });
-            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            const replyMsg = await interaction.followUp({ content: 'تم خروجك من القروب.', ephemeral: true });
+            setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
         }
     }
