@@ -155,7 +155,24 @@ client.on('messageCreate', async (message) => {
                 await nameMsg.delete().catch(() => {});
                 await namePrompt.delete().catch(() => {});
 
-                const groupName = nameMsg.content;
+                const groupName = nameMsg.content.trim();
+                
+                let isColorRoleName = false;
+                const lowerName = groupName.toLowerCase();
+                for (let i = 0; i <= 11; i++) {
+                    if (lowerName === String(i) || lowerName === `${i}`) {
+                        isColorRoleName = true;
+                        break;
+                    }
+                }
+                if (lowerName === '10 10' || lowerName === '10-10') {
+                    isColorRoleName = true;
+                }
+
+                if (isColorRoleName) {
+                    return message.channel.send({ content: 'الاسم محجوز، اختر اسم غيره.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+                }
+
                 const groupKey = 'group_' + Date.now();
 
                 try {
@@ -163,7 +180,7 @@ client.on('messageCreate', async (message) => {
                     
                     const groupRole = await guild.roles.create({
                         name: groupName,
-                        color: DefaultResolver = '#2b2d31',
+                        color: '#2b2d31',
                         reason: 'Group Role'
                     });
 
@@ -213,21 +230,23 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    let groupsObj = db.groups.groups || db.groups;
-    let userGroupKey = Object.keys(groupsObj).find(k => groupsObj[k].leaderId === message.author.id || (groupsObj[k].members && groupsObj[k].members.includes(message.author.id)));
-    
-    if (userGroupKey) {
-        let userGroup = groupsObj[userGroupKey];
-        const earnedXp = 2;
-        userGroup.xp = (userGroup.xp || 0) + earnedXp;
-        userGroup.textCount = (userGroup.textCount || 0) + 1;
+    if (message.channel.type === ChannelType.GuildText) {
+        let groupsObj = db.groups.groups || db.groups;
+        let userGroupKey = Object.keys(groupsObj).find(k => groupsObj[k].leaderId === message.author.id || (groupsObj[k].members && groupsObj[k].members.includes(message.author.id)));
+        
+        if (userGroupKey) {
+            let userGroup = groupsObj[userGroupKey];
+            const earnedXp = 2;
+            userGroup.xp = (userGroup.xp || 0) + earnedXp;
+            userGroup.textCount = (userGroup.textCount || 0) + 1;
 
-        if (userGroup.xp >= 5000) {
-            let increments = Math.floor(userGroup.xp / 5000);
-            userGroup.xp += increments * 1000;
-            userGroup.xp = userGroup.xp % 5000;
+            if (userGroup.xp >= 5000) {
+                let increments = Math.floor(userGroup.xp / 5000);
+                userGroup.xp += increments * 1000;
+                userGroup.xp = userGroup.xp % 5000;
+            }
+            saveDb();
         }
-        saveDb();
     }
 });
 
@@ -301,7 +320,26 @@ client.on('interactionCreate', async (interaction) => {
 
         collector.on('collect', async (msg) => {
             await msg.delete().catch(() => {});
-            const newName = msg.content;
+            const newName = msg.content.trim();
+            
+            let isColorRoleName = false;
+            const lowerName = newName.toLowerCase();
+            for (let i = 0; i <= 11; i++) {
+                if (lowerName === String(i) || lowerName === `${i}`) {
+                    isColorRoleName = true;
+                    break;
+                }
+            }
+            if (lowerName === '10 10' || lowerName === '10-10') {
+                isColorRoleName = true;
+            }
+
+            if (isColorRoleName) {
+                const failMsg = await interaction.channel.send({ content: 'الاسم محجوز، اختر اسم غيره.' });
+                setTimeout(() => failMsg.delete().catch(() => {}), 5000);
+                return;
+            }
+
             myGroup.name = newName;
             
             try {
