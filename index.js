@@ -61,6 +61,11 @@ async function updateTopGroupsBoard() {
             .setColor('#2b2d31')
             .setImage('https://cdn.discordapp.com/attachments/1531644529818472458/1536220233352880158/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7a9c15&is=6a794a95&hm=0a15683d587862c99d97e417edc6d32d9e6fff18567628bb659195228329b193&');
 
+        let topGroup = sortedGroups[0] ? sortedGroups[0][1] : null;
+        if (topGroup) {
+            embed.setThumbnail(topGroup.leaderAvatar || null);
+        }
+
         let descText = "";
         for (let i = 0; i < 7; i++) {
             let g = sortedGroups[i] ? sortedGroups[i][1] : null;
@@ -139,7 +144,7 @@ client.on('messageCreate', async (message) => {
         }
 
         await message.react('✅').catch(() => {});
-        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح أونر للجروب:', ephemeral: true }).catch(() => null);
+        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح ليدر للجروب:', ephemeral: true }).catch(() => null);
 
         const filter = m => m.author.id === message.author.id;
         const collector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
@@ -232,7 +237,7 @@ client.on('messageCreate', async (message) => {
                     };
                     saveDb();
 
-                    await message.channel.send({ content: `تم إنشاء القروب بنجاح للأونر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
+                    await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
                     console.error(err);
                 }
@@ -325,14 +330,14 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.update({ components: [row] }).catch(() => {});
 
     if (selectedValue === 'btn_role_color') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
         const replyMsg = await interaction.followUp({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         return;
     }
 
     if (selectedValue === 'btn_edit_role') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
@@ -385,7 +390,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_invite_member') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
@@ -427,7 +432,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_kick_member') {
-        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        if (!isLeader) return interaction.followUp({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار لليدر فقط).', ephemeral: true });
         
         try {
             await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
