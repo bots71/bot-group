@@ -5,7 +5,6 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     EmbedBuilder,
-    StringSelectMenuBuilder,
     ChannelType,
     PermissionFlagsBits
 } = require('discord.js');
@@ -58,7 +57,7 @@ async function updateTopGroupsBoard() {
         let groupsObj = db.groups.groups || db.groups;
         let sortedGroups = Object.entries(groupsObj).sort((a, b) => (b[1].xp || 0) - (a[1].xp || 0)).slice(0, 7);
 
-        let description = sortedGroups.length === 0 ? "لا توجد قروبات نشطة حالياً." : sortedGroups.map((g, index) => {
+        let description = sortedGroups.length === 0 ? "" : sortedGroups.map((g, index) => {
             let data = g[1];
             let membersCount = (data.members ? data.members.length : 0) + 1;
             return `**${index + 1} | ${data.name}**\n- الأعضاء: ${membersCount}\n- الكلمات: ${data.textCount || 0}\n- الأكس بي: ${data.xp || 0}\n`;
@@ -110,20 +109,22 @@ client.on('messageCreate', async (message) => {
                 .setColor('#2b2d31')
                 .setThumbnail('https://cdn.discordapp.com/attachments/1531644529818472458/1536192486597197824/A2CE557C-489A-468B-826F-8076DE214463.png?ex=6a7a823d&is=6a7930bd&hm=f3847c68a29e21539c5c2b84af48a5255a970a72bc9aa970732f9ac8e330ff11&');
 
-            const selectMenu = new StringSelectMenuBuilder()
-                .setCustomId('leader_select_menu')
-                .setPlaceholder('Choose a leader action')
-                .addOptions([
-                    { label: 'Role Color', description: 'تغيير لون رول القروب', value: 'btn_role_color', emoji: '🎨' },
-                    { label: 'Edit Role', description: 'تعديل اسم رول القروب', value: 'btn_edit_role', emoji: '✏️' },
-                    { label: 'Invite Member', description: 'دعوة عضو أو أكثر للقروب', value: 'btn_invite_member', emoji: '✉️' },
-                    { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member', emoji: '👢' },
-                    { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats', emoji: '📊' },
-                    { label: 'Leave Group', description: 'الخروج أو حذف القروب', value: 'btn_leave_group', emoji: '🚪' }
-                ]);
+            const row1 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('btn_role_color').setLabel('Role Color (تغيير لون رول القروب)').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('btn_edit_role').setLabel('Edit Role (تعديل اسم رول القروب)').setStyle(ButtonStyle.Secondary)
+            );
 
-            const row = new ActionRowBuilder().addComponents(selectMenu);
-            await leaderChannel.send({ embeds: [embed], components: [row] });
+            const row2 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('btn_invite_member').setLabel('Invite Member (دعوة عضو أو أكثر)').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('btn_kick_member').setLabel('Kick Member (طرد عضو من القروب)').setStyle(ButtonStyle.Secondary)
+            );
+
+            const row3 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('btn_my_stats').setLabel('My Stats (عرض إحصائيات القروب)').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('btn_leave_group').setLabel('Leave / Delete Group (خروج أو حذف)').setStyle(ButtonStyle.Secondary)
+            );
+
+            await leaderChannel.send({ embeds: [embed], components: [row1, row2, row3] });
             await message.react('✅').catch(() => {});
         } else {
             await message.react('❌').catch(() => {});
@@ -138,7 +139,7 @@ client.on('messageCreate', async (message) => {
         }
 
         await message.react('✅').catch(() => {});
-        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح أونر للجروب:', ephemeral: true }).catch(() => null);
+        const replyMsg = await message.reply({ content: 'ارفق أونر الجروب (منشن الشخص):', ephemeral: true }).catch(() => null);
 
         const filter = m => m.author.id === message.author.id;
         const collector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
@@ -158,7 +159,7 @@ client.on('messageCreate', async (message) => {
                 return message.channel.send({ content: 'هذا الشخص لديه قروب مسبقاً.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
-            const namePrompt = await message.channel.send({ content: 'ما هو اسم القروب؟' });
+            const namePrompt = await message.channel.send({ content: 'ارفق اسم الجروب:' });
             const nameCollector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
 
             nameCollector.on('collect', async (nameMsg) => {
@@ -203,7 +204,7 @@ client.on('messageCreate', async (message) => {
                     };
                     saveDb();
 
-                    await message.channel.send({ content: `تم إنشاء القروب بنجاح! يجب اكتمال 5 أعضاء خلال 3 أيام وإلا سيتم حذف القروب تلقائياً.` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
+                    await message.channel.send({ content: `تم إنشاء القروب تلقائيا بنجاح! يجب اكتمال 5 أعضاء خلال 3 أيام وإلا سيتم حذف القروب.` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
                     console.error(err);
                 }
@@ -263,9 +264,8 @@ setInterval(async () => {
 }, 60000);
 
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isStringSelectMenu()) return;
-    if (interaction.customId !== 'leader_select_menu') return;
-
+    if (!interaction.isButton()) return;
+    const customId = interaction.customId;
     const guild = interaction.guild;
     const member = interaction.member;
     const userId = member.id;
@@ -275,14 +275,35 @@ client.on('interactionCreate', async (interaction) => {
     let myGroup = myGroupKey ? groupsObj[myGroupKey] : null;
     let isLeader = myGroup && myGroup.leaderId === userId;
 
-    const selectedValue = interaction.values[0];
+    if (customId.startsWith('accept_invite_')) {
+        const gKey = customId.replace('accept_invite_', '');
+        const targetGroup = groupsObj[gKey];
+        if (targetGroup) {
+            if (!targetGroup.members.includes(userId) && targetGroup.leaderId !== userId) {
+                targetGroup.members.push(userId);
+                saveDb();
 
-    if (selectedValue === 'btn_role_color') {
+                try {
+                    let tChan = guild.channels.cache.get(targetGroup.textChannelId);
+                    let vChan = guild.channels.cache.get(targetGroup.voiceChannelId);
+                    if (tChan) await tChan.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true }).catch(()=>{});
+                    if (vChan) await vChan.permissionOverwrites.create(userId, { ViewChannel: true, Connect: true, Speak: true }).catch(()=>{});
+                } catch (e) {}
+            }
+        }
+        return interaction.update({ content: 'تم انضمامك للقروب بنجاح!', components: [] });
+    }
+
+    if (customId.startsWith('decline_invite_')) {
+        return interaction.update({ content: 'تم رفض الدعوة.', components: [] });
+    }
+
+    if (customId === 'btn_role_color') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
         return interaction.reply({ content: `حدد لونك من هنا <#${CHANNELS.COLOR_ROOM}>`, ephemeral: true });
     }
 
-    if (selectedValue === 'btn_edit_role') {
+    if (customId === 'btn_edit_role') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
         await interaction.reply({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
 
@@ -306,9 +327,9 @@ client.on('interactionCreate', async (interaction) => {
         });
     }
 
-    if (selectedValue === 'btn_invite_member') {
+    if (customId === 'btn_invite_member') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
-        await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم (يمكنك منشن أكثر من عضو):', ephemeral: true });
+        await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
@@ -333,7 +354,7 @@ client.on('interactionCreate', async (interaction) => {
         });
     }
 
-    if (selectedValue === 'btn_kick_member') {
+    if (customId === 'btn_kick_member') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك.', ephemeral: true });
         await interaction.reply({ content: 'منشن الأعضاء المراد طردهم:', ephemeral: true });
 
@@ -361,7 +382,7 @@ client.on('interactionCreate', async (interaction) => {
         });
     }
 
-    if (selectedValue === 'btn_my_stats') {
+    if (customId === 'btn_my_stats') {
         if (!myGroup) return interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
         const stats = `
 -1- أعضاء القروب: ${(myGroup.members ? myGroup.members.length : 0) + 1}
@@ -371,7 +392,7 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: stats, ephemeral: true });
     }
 
-    if (selectedValue === 'btn_leave_group') {
+    if (customId === 'btn_leave_group') {
         if (!myGroup) return interaction.reply({ content: 'القائمة غير مخصصة لك.', ephemeral: true });
         if (isLeader) {
             try {
@@ -396,38 +417,6 @@ client.on('interactionCreate', async (interaction) => {
             saveDb();
             return interaction.reply({ content: 'تم خروجك من القروب.', ephemeral: true });
         }
-    }
-});
-
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
-    const customId = interaction.customId;
-    const userId = interaction.user.id;
-    const guild = interaction.guild;
-
-    let groupsObj = db.groups.groups || db.groups;
-
-    if (customId.startsWith('accept_invite_')) {
-        const gKey = customId.replace('accept_invite_', '');
-        const targetGroup = groupsObj[gKey];
-        if (targetGroup) {
-            if (!targetGroup.members.includes(userId) && targetGroup.leaderId !== userId) {
-                targetGroup.members.push(userId);
-                saveDb();
-
-                try {
-                    let tChan = guild.channels.cache.get(targetGroup.textChannelId);
-                    let vChan = guild.channels.cache.get(targetGroup.voiceChannelId);
-                    if (tChan) await tChan.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true }).catch(()=>{});
-                    if (vChan) await vChan.permissionOverwrites.create(userId, { ViewChannel: true, Connect: true, Speak: true }).catch(()=>{});
-                } catch (e) {}
-            }
-        }
-        return interaction.update({ content: 'تم انضمامك للقروب بنجاح!', components: [] });
-    }
-
-    if (customId.startsWith('decline_invite_')) {
-        return interaction.update({ content: 'تم رفض الدعوة.', components: [] });
     }
 });
 
