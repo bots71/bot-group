@@ -281,6 +281,11 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_edit_role') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        
+        try {
+            await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
+        } catch (e) {}
+
         await interaction.reply({ content: 'اكتب اسم القروب الجديد:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
@@ -296,6 +301,7 @@ client.on('interactionCreate', async (interaction) => {
                 let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
                 if (tChan) await tChan.setName(newName).catch(()=>{});
                 if (vChan) await vChan.setName(newName).catch(()=>{});
+                await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: null });
             } catch (e) {}
 
             saveDb();
@@ -305,6 +311,11 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_invite_member') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
+        
+        try {
+            await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
+        } catch (e) {}
+
         await interaction.reply({ content: 'منشن الأعضاء المراد دعوتهم:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
@@ -312,6 +323,10 @@ client.on('interactionCreate', async (interaction) => {
 
         collector.on('collect', async (msg) => {
             await msg.delete().catch(() => {});
+            try {
+                await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: null });
+            } catch (e) {}
+
             const targetMembers = msg.mentions.members;
             if (!targetMembers || targetMembers.size === 0) return interaction.followUp({ content: 'لم يتم العثور على أعضاء.', ephemeral: true });
 
@@ -332,29 +347,39 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_kick_member') {
         if (!isLeader) return interaction.reply({ content: 'الصلاحيات غير مخصصة لك (هذا الخيار للأونر فقط).', ephemeral: true });
-        await interaction.reply({ content: 'منشن الأعضاء المراد طردهم:', ephemeral: true });
+        
+        try {
+            await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: true });
+        } catch (e) {}
+
+        await interaction.reply({ content: 'منشن العضو أو اكتب اليوزر المراد طرده:', ephemeral: true });
 
         const filter = m => m.author.id === userId;
         const collector = interaction.channel.createMessageCollector({ filter, time: 20000, max: 1 });
 
         collector.on('collect', async (msg) => {
             await msg.delete().catch(() => {});
-            const kicked = msg.mentions.members;
-            kicked.forEach(km => {
-                myGroup.members = myGroup.members.filter(id => id !== km.id);
-            });
+            try {
+                await interaction.channel.permissionOverwrites.edit(userId, { SendMessages: null });
+            } catch (e) {}
+
+            const targetMember = msg.mentions.members.first() || guild.members.cache.find(m => m.user.username === msg.content.trim() || m.user.tag === msg.content.trim() || m.id === msg.content.trim());
+
+            if (!targetMember) {
+                return interaction.followUp({ content: 'المينشن واليوزر غير صحيح', ephemeral: true });
+            }
+
+            myGroup.members = myGroup.members.filter(id => id !== targetMember.id);
             
             try {
                 let tChan = guild.channels.cache.get(myGroup.textChannelId);
                 let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
-                kicked.forEach(async km => {
-                    if (tChan) await tChan.permissionOverwrites.delete(km.id).catch(()=>{});
-                    if (vChan) await vChan.permissionOverwrites.delete(km.id).catch(()=>{});
-                });
+                if (tChan) await tChan.permissionOverwrites.delete(targetMember.id).catch(()=>{});
+                if (vChan) await vChan.permissionOverwrites.delete(targetMember.id).catch(()=>{});
             } catch (e) {}
 
             saveDb();
-            await interaction.followUp({ content: 'تم طرد الأعضاء المحددين بنجاح.', ephemeral: true });
+            await interaction.followUp({ content: 'تم طرد العضو المحدد بنجاح.', ephemeral: true });
         });
     }
 
