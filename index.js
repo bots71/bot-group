@@ -242,8 +242,7 @@ client.on('messageCreate', async (message) => {
                         textCount: 0,
                         textChannelId: textChannel.id,
                         voiceChannelId: voiceChannel.id,
-                        createdAt: Date.now(),
-                        warningDeadline: Date.now() + (3 * 24 * 60 * 60 * 1000)
+                        createdAt: Date.now()
                     };
                     saveDb();
 
@@ -275,39 +274,6 @@ client.on('messageCreate', async (message) => {
         }
     }
 });
-
-setInterval(async () => {
-    loadDb();
-    let groupsObj = db.groups.groups || db.groups;
-    let now = Date.now();
-    let modified = false;
-
-    for (let key in groupsObj) {
-        let g = groupsObj[key];
-        let totalMembers = (g.members ? g.members.length : 0) + 1;
-        if (totalMembers < 5) {
-            if (g.warningDeadline && now > g.warningDeadline) {
-                try {
-                    let guild = client.guilds.cache.first();
-                    if (guild) {
-                        let tChan = guild.channels.cache.get(g.textChannelId);
-                        let vChan = guild.channels.cache.get(g.voiceChannelId);
-                        let role = guild.roles.cache.get(g.roleId);
-                        if (tChan) await tChan.delete().catch(() => {});
-                        if (vChan) await vChan.delete().catch(() => {});
-                        if (role) await role.delete().catch(() => {});
-                    }
-                } catch (e) {}
-                delete groupsObj[key];
-                modified = true;
-            }
-        } else {
-            g.warningDeadline = null;
-            modified = true;
-        }
-    }
-    if (modified) saveDb();
-}, 30000);
 
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isStringSelectMenu()) return;
