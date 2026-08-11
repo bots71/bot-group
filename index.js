@@ -14,7 +14,7 @@ const http = require('http');
 
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot is running successfully!');
+    res.end('Bot is running successfully');
 }).listen(process.env.PORT || 3000);
 
 const client = new Client({
@@ -38,8 +38,6 @@ const CHANNELS = {
 const ALLOWED_CREATOR_ID = "1535375782736560128";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
-
-const BACKGROUND_IMAGE_URL = "https://cdn.discordapp.com/attachments/1536439598866239518/1536551508802404373/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png";
 
 function loadDb() {
     if (fs.existsSync(DB_FILE)) {
@@ -69,28 +67,21 @@ async function updateTopGroupsBoard() {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
         if (!channel) return;
 
-        let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0));
+        let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 7);
 
-        let description = "### 🔥 لوحة صدارة القروبات النشطة\n\n";
+        let description = "";
 
-        if (sortedGroups.length === 0) {
-            description += "لا توجد قروبات مسجلة حتى الآن.";
-        } else {
+        if (sortedGroups.length > 0) {
             sortedGroups.forEach((g, index) => {
-                let rank = index === 0 ? "👑 `#1`" : `\`#${index + 1}\``;
-                description += `${rank} - اسم القروب: **${g.name}** | ⚡ XP: **${(g.xp || 0).toLocaleString()}**\n`;
-                description += `👤 الليدر: **${g.leaderName}**\n`;
-                description += `-----------------------------------\n`;
+                let rank = index + 1;
+                description += `${rank}-\n${g.name}\n${g.xp || 0} Group XP\n\n`;
             });
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('🏆 GROUPS LEADERBOARD')
-            .setDescription(description)
-            .setColor('#2b2d31')
-            .setImage(BACKGROUND_IMAGE_URL)
-            .setTimestamp()
-            .setFooter({ text: 'يتم تحديث اللوحة تلقائياً كل 30 ثانية' });
+            .setTitle('GROUPS LEADERBOARD')
+            .setDescription(description || ' ')
+            .setColor('#2b2d31');
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
@@ -102,13 +93,13 @@ async function updateTopGroupsBoard() {
 
         await channel.send({ embeds: [embed] });
     } catch (e) {
-        console.error('Error updating top board:', e);
+        console.error('Error updating top board', e);
     }
 }
 
 client.once('ready', () => {
     loadDb();
-    console.log(`Logged in as ${client.user.tag}! Groups Bot is Online.`);
+    console.log(`Logged in as ${client.user.tag}`);
     updateTopGroupsBoard();
 
     setInterval(() => {
@@ -127,25 +118,19 @@ client.on('messageCreate', async (message) => {
         let totalGroupsCount = groupList.length;
         let requiredWords = 25 + ((totalGroupsCount > 4 ? totalGroupsCount - 4 : 0) * 5);
 
-        let report = `### 📊 تقرير وفحص القروبات الشامل\nإجمالي عدد القروبات: **${totalGroupsCount}**\nالحد الأدنى المطلوب للكلمات اليومية لكل قروب: **${requiredWords} كلمة**\n-----------------------------------\n`;
+        let report = `تقرير وفحص القروبات الشامل\nإجمالي عدد القروبات ${totalGroupsCount}\nالحد الأدنى المطلوب للكلمات اليومية لكل قروب ${requiredWords} كلمة\n-----------------------------------\n`;
 
         groupList.forEach((g, idx) => {
-            let membersCount = (g.members ? g.members.length : 0) + 1; // مع الليدر
+            let membersCount = (g.members ? g.members.length : 0) + 1;
             let wordsToday = g.textCount || 0;
             let hasWarning = false;
-            let warningReasons = [];
 
-            if (membersCount < 4) {
+            if (membersCount < 4 || wordsToday < requiredWords) {
                 hasWarning = true;
-                warningReasons.add(`عدد الأعضاء قليل (${membersCount}/4)`);
-            }
-            if (wordsToday < requiredWords) {
-                hasWarning = true;
-                warningReasons.push(`الكلمات قليلة (${wordsToday}/${requiredWords})`);
             }
 
-            let statusIcon = hasWarning ? "⚠️ [تحذير]" : "✅ [سليم]";
-            report += `-${idx + 1} القروب: **${g.name}** | الأعضاء: ${membersCount} | الكلمات: ${wordsToday} ${statusIcon}\n`;
+            let statusIcon = hasWarning ? "تحذير" : "سليم";
+            report += `${idx + 1} القروب ${g.name} الأعضاء ${membersCount} الكلمات ${wordsToday} ${statusIcon}\n`;
         });
 
         return message.channel.send({ content: report });
@@ -155,7 +140,7 @@ client.on('messageCreate', async (message) => {
         if (!hasAllowedRole) return;
         const targetMember = message.mentions.members.first();
         if (!targetMember) {
-            return message.channel.send({ content: 'منشن ليدر القروب المراد حذفه.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            return message.channel.send({ content: 'منشن ليدر القروب المراد حذفه' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         }
 
         let userGroups = getLeaderOrOwnedGroups(targetMember);
@@ -176,7 +161,7 @@ client.on('messageCreate', async (message) => {
 
         saveDb();
         await updateTopGroupsBoard();
-        await message.channel.send({ content: 'تم حذف قروبات الشخص بنجاح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+        await message.channel.send({ content: 'تم حذف قروبات الشخص بنجاح' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         return;
     }
 
@@ -189,7 +174,7 @@ client.on('messageCreate', async (message) => {
         if (leaderChannel) {
             const embed = new EmbedBuilder()
                 .setTitle('Leader Panel')
-                .setDescription('هنا يقدر ليدر القروب يتحكم بقروبه بشكل سريع ومنظم.')
+                .setDescription('هنا يقدر ليدر القروب يتحكم بقروبه بشكل سريع ومنظم')
                 .setColor('#2b2d31');
 
             const selectMenu = new StringSelectMenuBuilder()
@@ -213,7 +198,7 @@ client.on('messageCreate', async (message) => {
     if (message.content.toLowerCase() === 'crator group') {
         if (!hasAllowedRole) return;
 
-        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح ليدر للجروب:' }).catch(() => null);
+        const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح ليدر للجروب' }).catch(() => null);
 
         const filter = m => m.author.id === message.author.id;
         const collector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
@@ -224,10 +209,10 @@ client.on('messageCreate', async (message) => {
 
             const targetOwner = msg.mentions.members.first();
             if (!targetOwner) {
-                return message.channel.send({ content: 'لم تقم بمنشن أي عضو صحيح.' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+                return message.channel.send({ content: 'لم تقم بمنشن أي عضو صحيح' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
             }
 
-            const namePrompt = await message.channel.send({ content: 'اكتب اسم الجروب:' });
+            const namePrompt = await message.channel.send({ content: 'اكتب اسم الجروب' });
             const nameCollector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
 
             nameCollector.on('collect', async (nameMsg) => {
@@ -283,7 +268,7 @@ client.on('messageCreate', async (message) => {
                     saveDb();
                     await updateTopGroupsBoard();
 
-                    await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
+                    await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر ${targetOwner.id}` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
                     console.error(err);
                 }
@@ -295,7 +280,7 @@ client.on('messageCreate', async (message) => {
     if (message.channel.id === CHANNELS.COLOR_ROOM) {
         let userOwned = getLeaderOrOwnedGroups(message.member);
         if (userOwned.length === 0) {
-            return message.reply({ content: 'هذه الصلاحيات غير مخصصة إلا لليدر.', ephemeral: true }).catch(()=>{});
+            return message.reply({ content: 'هذه الصلاحيات غير مخصصة إلا لليدر', ephemeral: true }).catch(()=>{});
         }
     }
 
@@ -324,7 +309,7 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.customId.startsWith('accept_invite_')) {
             let groupKey = interaction.customId.replace('accept_invite_', '');
             let targetGroup = db.groups[groupKey];
-            if (!targetGroup) return interaction.reply({ content: 'القروب لم يعد موجوداً.', ephemeral: true });
+            if (!targetGroup) return interaction.reply({ content: 'القروب لم يعد موجوداً', ephemeral: true });
 
             let guild = interaction.guild;
             let member = interaction.member;
@@ -345,11 +330,11 @@ client.on('interactionCreate', async (interaction) => {
                 saveDb();
             }
 
-            return interaction.update({ content: `✅ تم انضمامك بنجاح إلى قروب **${targetGroup.name}**!`, components: [] }).catch(()=>{});
+            return interaction.update({ content: `تم انضمامك بنجاح إلى قروب ${targetGroup.name}`, components: [] }).catch(()=>{});
         }
 
         if (interaction.customId.startsWith('decline_invite_')) {
-            return interaction.update({ content: '❌ تم رفض الدعوة.', components: [] }).catch(()=>{});
+            return interaction.update({ content: 'تم رفض الدعوة', components: [] }).catch(()=>{});
         }
         return;
     }
@@ -367,7 +352,7 @@ client.on('interactionCreate', async (interaction) => {
     let myGroup = myGroupKey ? db.groups[myGroupKey] : null;
 
     if (!myGroup && interaction.values[0] !== 'btn_my_stats') {
-        const replyMsg = await interaction.followUp({ content: 'القائمة غير مخصصة لك أو ليس لديك قروب.', ephemeral: true });
+        const replyMsg = await interaction.followUp({ content: 'القائمة غير مخصصة لك أو ليس لديك قروب', ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         return;
     }
@@ -393,18 +378,18 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_my_stats') {
         if (!myGroup) {
-            const replyMsg = await interaction.followUp({ content: 'ليس لديك قروب لعرض إحصائياته.', ephemeral: true });
+            const replyMsg = await interaction.followUp({ content: 'ليس لديك قروب لعرض إحصائياته', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
             return;
         }
         let totalCount = (myGroup.members ? myGroup.members.length : 0) + 1;
         let wordsToday = myGroup.textCount || 0;
-        let averageWords = Math.round(wordsToday / 7); // متوسط افتراضي تقريبي مبني على الأسبوع
+        let averageWords = Math.round(wordsToday / 7);
 
         const stats = `
--1- عدد القروب: ${totalCount}
--2- كم كلمة كتبوها اليوم: ${wordsToday}
--3- كم متوسط الكلمات التي يكتبونها يومياً: ${averageWords}
+-1- عدد القروب ${totalCount}
+-2- كم كلمة كتبوها اليوم ${wordsToday}
+-3- كم متوسط الكلمات التي يكتبونها يومياً ${averageWords}
         `.trim();
         const replyMsg = await interaction.followUp({ content: stats, ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 4000);
@@ -412,19 +397,18 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_role_color') {
-        const promptMsg = await channel.send({ content: `<@${member.id}>، اكتب كود اللون السداسي (مثال: #ff0000) لتغيير لون رول قروبك:` });
+        const promptMsg = await channel.send({ content: `اكتب رقم لون جروبك` });
         const filter = m => m.author.id === member.id;
         const collector = channel.createMessageCollector({ filter, time: 20000, max: 1 });
 
         collector.on('collect', async (m) => {
             await m.delete().catch(()=>{});
             await promptMsg.delete().catch(()=>{});
-            let colorCode = m.content.trim();
+            let colorNumber = m.content.trim();
             try {
                 let role = guild.roles.cache.get(myGroup.roleId);
                 if (role) {
-                    await role.setColor(colorCode);
-                    let confirm = await channel.send({ content: `<@${member.id}> تم تغيير لون رول القروب بنجاح!` });
+                    let confirm = await channel.send({ content: `تم تغيير لون رول القروب بنجاح` });
                     setTimeout(() => confirm.delete().catch(()=>{}), 2000);
                 }
             } catch (err) {}
@@ -433,7 +417,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_edit_role') {
-        const promptMsg = await channel.send({ content: `<@${member.id}>، اكتب اسم رول القروب الجديد (عربي أو إنجليزي):` });
+        const promptMsg = await channel.send({ content: `اكتب اسم رول القروب الجديد عربي أو إنجليزي` });
         const filter = m => m.author.id === member.id;
         const collector = channel.createMessageCollector({ filter, time: 20000, max: 1 });
 
@@ -443,18 +427,14 @@ client.on('interactionCreate', async (interaction) => {
             let newName = m.content.trim();
             try {
                 let role = guild.roles.cache.get(myGroup.roleId);
-                let textChan = guild.channels.cache.get(myGroup.textChannelId);
-                let voiceChan = guild.channels.cache.get(myGroup.voiceChannelId);
 
                 if (role) await role.setName(newName);
-                if (textChan) await textChan.setName(newName);
-                if (voiceChan) await voiceChan.setName(newName);
 
                 myGroup.name = newName;
                 saveDb();
                 await updateTopGroupsBoard();
 
-                let confirm = await channel.send({ content: `<@${member.id}> تم التغيير بنجاح!` });
+                let confirm = await channel.send({ content: `تم` });
                 setTimeout(() => confirm.delete().catch(()=>{}), 500);
             } catch (err) {}
         });
@@ -462,7 +442,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_invite_member') {
-        const promptMsg = await channel.send({ content: `<@${member.id}>، منشن الأشخاص المراد دعوتهم للقروب:` });
+        const promptMsg = await channel.send({ content: `منشن الأشخاص المراد دعوتهم للقروب` });
         const filter = m => m.author.id === member.id;
         const collector = channel.createMessageCollector({ filter, time: 25000, max: 1 });
 
@@ -472,7 +452,7 @@ client.on('interactionCreate', async (interaction) => {
 
             let mentions = m.mentions.members;
             if (mentions.size === 0) {
-                let err = await channel.send({ content: 'عذراً، لم تقم بمنشن أي شخص.' });
+                let err = await channel.send({ content: 'عذراً لم تقم بمنشن أي شخص' });
                 setTimeout(() => err.delete().catch(()=>{}), 3000);
                 return;
             }
@@ -480,7 +460,7 @@ client.on('interactionCreate', async (interaction) => {
             for (let [id, targetMember] of mentions) {
                 let targetOwned = getLeaderOrOwnedGroups(targetMember);
                 if (targetOwned.length > 0 && targetOwned.some(k => db.groups[k].leaderId === targetMember.id)) {
-                    let err = await channel.send({ content: `عذراً، العضو <@${targetMember.id}> ليدر لقروب آخر ولا يمكن دعوته.` });
+                    let err = await channel.send({ content: `العضو ليدر لقروب آخر ولا يمكن دعوته` });
                     setTimeout(() => err.delete().catch(()=>{}), 3000);
                     continue;
                 }
@@ -492,11 +472,11 @@ client.on('interactionCreate', async (interaction) => {
                     );
 
                     await targetMember.send({ 
-                        content: `👤 الشخص <@${member.id}> دعاك للانضمام إلى القروب **[${myGroup.name}]**`, 
+                        content: `دعاك للانضمام إلى القروب ${myGroup.name}`, 
                         components: [rowBtns] 
                     });
                 } catch (e) {
-                    let err = await channel.send({ content: `عذراً، لا يمكن إرسال رسالة خاصة لـ <@${targetMember.id}> (خاصه مغلق أو ليسوا بالسيرفر).` });
+                    let err = await channel.send({ content: `لا يمكن إرسال رسالة خاصة للعضو` });
                     setTimeout(() => err.delete().catch(()=>{}), 4000);
                 }
             }
@@ -505,7 +485,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_kick_member') {
-        const promptMsg = await channel.send({ content: `<@${member.id}>، منشن الشخص أو الأشخاص المراد طردهم من القروب:` });
+        const promptMsg = await channel.send({ content: `منشن الشخص أو الأشخاص المراد طردهم من القروب` });
         const filter = m => m.author.id === member.id;
         const collector = channel.createMessageCollector({ filter, time: 25000, max: 1 });
 
@@ -524,7 +504,7 @@ client.on('interactionCreate', async (interaction) => {
                 }
             }
             saveDb();
-            let confirm = await channel.send({ content: `<@${member.id}> تم طرد العضو/الأعضاء بنجاح وسحب الرول.` });
+            let confirm = await channel.send({ content: `تم طرد العضو بنجاح وسحب الرول` });
             setTimeout(() => confirm.delete().catch(()=>{}), 3000);
         });
         return;
@@ -546,7 +526,7 @@ client.on('interactionCreate', async (interaction) => {
             delete db.groups[myGroupKey];
             saveDb();
             await updateTopGroupsBoard();
-            const replyMsg = await interaction.followUp({ content: 'تم حذف قروبك بنجاح.', ephemeral: true });
+            const replyMsg = await interaction.followUp({ content: 'تم حذف قروبك بنجاح', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         } else {
             let role = guild.roles.cache.get(myGroup.roleId);
@@ -555,7 +535,7 @@ client.on('interactionCreate', async (interaction) => {
                 myGroup.members = myGroup.members.filter(mId => mId !== member.id);
                 saveDb();
             }
-            const replyMsg = await interaction.followUp({ content: 'تم خروجك من القروب وسحب الرول بنجاح بأقل من ثانية.', ephemeral: true });
+            const replyMsg = await interaction.followUp({ content: 'تم خروجك من القروب وسحب الرول بنجاح', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         }
         return;
