@@ -64,9 +64,9 @@ async function updateTopGroupsBoard() {
         let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 7);
         let description = "";
 
-        // التنسيق الجديد: الاسم تحت الشرطة، ثم XP ثم الرقم
+        // التعديل هنا: اسم القروب بجانب الرقم (1- h) ثم الـ XP في السطر التالي
         sortedGroups.forEach((g, index) => {
-            description += `${index + 1}-\n${g.name}\nXP ${g.xp || 0}\n\n`;
+            description += `${index + 1}- ${g.name}\nXP ${g.xp || 0}\n\n`;
         });
 
         const embed = new EmbedBuilder()
@@ -80,7 +80,6 @@ async function updateTopGroupsBoard() {
     } catch (e) { console.error('Error updating top board', e); }
 }
 
-// ... سأكمل لك بقية الدوال (Create, Setup, Logic) في الرد القادم لضمان الحجم الكامل
 client.once('ready', () => {
     loadDb();
     console.log(`Logged in as ${client.user.tag}`);
@@ -149,10 +148,9 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    if (message.content === '!setup') {
-        if (!hasAllowedRole || message.channel.id !== CHANNELS.LEADER_PANEL) {
-            return;
-        }
+    // دعم أمر setup أو setip لتفادي الخطأ الإملائي وتسهيل الإرسال
+    if (message.content === '!setup' || message.content === '!setip') {
+        if (!hasAllowedRole) return;
 
         const leaderChannel = message.guild.channels.cache.get(CHANNELS.LEADER_PANEL);
         if (leaderChannel) {
@@ -170,6 +168,9 @@ client.on('messageCreate', async (message) => {
 
             const row = new ActionRowBuilder().addComponents(selectMenu);
             await leaderChannel.send({ components: [row] });
+            if (message.channel.id !== CHANNELS.LEADER_PANEL) {
+                await message.reply({ content: `تم إرسال اللوحة إلى روم <#${CHANNELS.LEADER_PANEL}>` }).catch(()=>{});
+            }
         }
         return;
     }
