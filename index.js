@@ -42,6 +42,12 @@ function loadDb() {
 
 function saveDb() { fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4)); }
 
+function getLeaderGroupsByMember(member) {
+    if (!member) return [];
+    let foundKeys = Object.keys(db.groups).filter(k => db.groups[k].leaderId === member.id);
+    return foundKeys.map(k => ({ key: k, data: db.groups[k] }));
+}
+
 function getLeaderGroupByMember(member) {
     if (!member) return null;
     let foundKey = Object.keys(db.groups).find(k => db.groups[k].leaderId === member.id);
@@ -125,13 +131,16 @@ client.on('messageCreate', async (message) => {
             return message.channel.send({ content: 'منشن ليدر القروب المراد حذفه' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
         }
 
-        let leaderGroup = getLeaderGroupByMember(targetMember);
-        if (leaderGroup) {
-            let myGroup = leaderGroup.data;
+        let leaderGroups = getLeaderGroupsByMember(targetMember);
+        if (leaderGroups.length === 0) {
+            await message.react('❌').catch(() => {});
+            return message.channel.send({ content: 'هذا الشخص لا يملك جروب' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+        }
+
+        let guild = message.guild;
+        for (let groupObj of leaderGroups) {
+            let myGroup = groupObj.data;
             try {
-                let guild = message.guild;
-                
-                // حماية الروم العام وعدم حذفه نهائياً
                 if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
                     let tChan = guild.channels.cache.get(myGroup.textChannelId);
                     if (tChan) await tChan.delete().catch(() => {});
@@ -140,16 +149,16 @@ client.on('messageCreate', async (message) => {
                     let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
                     if (vChan) await vChan.delete().catch(() => {});
                 }
-                
                 let role = guild.roles.cache.get(myGroup.roleId);
                 if (role) await role.delete().catch(() => {});
             } catch (e) {}
 
-            delete db.groups[leaderGroup.key];
-            saveDb();
-            await updateTopGroupsBoard();
-            await message.channel.send({ content: 'تم حذف قروب الشخص بنجاح' }).then(m => setTimeout(() => m.delete().catch(()=>{}), 5000));
+            delete db.groups[groupObj.key];
         }
+
+        saveDb();
+        await updateTopGroupsBoard();
+        await message.react('✅').catch(() => {});
         return;
     }
 
@@ -332,6 +341,14 @@ client.on('interactionCreate', async (interaction) => {
 
     const selectedValue = interaction.values[0];
 
+    // إعادة ضبط القائمة لتصبح بدون علامة صح ثابتة ولكي يستطيع اختيار نفس الخيار مراراً وتكراراً
+    const originalRow = interaction.message.components[0];
+    if (originalRow) {
+        const newSelectMenu = StringSelectMenuBuilder.from(originalRow.components[0]);
+        const resetRow = new ActionRowBuilder().addComponents(newSelectMenu);
+        await interaction.message.edit({ components: [resetRow] }).catch(() => {});
+    }
+
     let leaderObj = getLeaderGroupByMember(member);
     let memberObj = getMemberGroupByRole(member);
 
@@ -389,6 +406,16 @@ client.on('interactionCreate', async (interaction) => {
             try {
                 let role = guild.roles.cache.get(myGroup.roleId);
                 if (role) await role.setName(newName).catch(() => {});
+
+                if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
+                    let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                    if (tChan) await tChan.setName(newName).catch(() => {});
+                }
+
+                if (myGroup.voiceChannelId) {
+                    let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                    if (vChan) await vChan.setName(newName).catch(() => {});
+                }
 
                 myGroup.name = newName;
                 saveDb();
@@ -484,19 +511,16 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_delete_group') {
         try {
-            // حذف روم النص الخاص بالقروب فقط مع التأكد التام من عدم المساس بالروم المحمي
             if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
                 let tChan = guild.channels.cache.get(myGroup.textChannelId);
                 if (tChan) await tChan.delete().catch(() => {});
             }
 
-            // حذف روم الفويس الخاص بالقروب
             if (myGroup.voiceChannelId) {
                 let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
                 if (vChan) await vChan.delete().catch(() => {});
             }
 
-            // حذف رول القروب نهائياً من السيرفر (مما يزيله تلقائياً عن الليدر وكل الأعضاء)
             let role = guild.roles.cache.get(myGroup.roleId);
             if (role) await role.delete().catch(() => {});
         } catch (e) {}
