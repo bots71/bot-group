@@ -24,7 +24,8 @@ const CHANNELS = {
     SETUP_TARGET: "1536594815779864576",
     PROTECTED_PANEL_CHANNEL: "1536635180272451655", // الروم المحمي الذي لا يمكن حذفه أبداً
     TEXT_CATEGORY: "1536221607645814874",
-    VOICE_CATEGORY: "1536221822717141012"
+    VOICE_CATEGORY: "1536221822717141012",
+    RULES_TARGET_CHANNEL: "1535491432230555678" // روم إرسال القوانين الجديد
 };
 
 const ALLOWED_CREATOR_ID = "1535375782736560128";
@@ -97,6 +98,50 @@ client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
     const hasAllowedRole = message.member.roles.cache.has(ALLOWED_CREATOR_ID) || message.author.id === ALLOWED_CREATOR_ID;
+
+    // ميزة إرسال القوانين بالستايل المطلوب عند كتابة sent في الروم المخصص
+    if (message.channel.id === CHANNELS.RULES_TARGET_CHANNEL) {
+        if (message.content.trim().toLowerCase() === 'sent' && hasAllowedRole) {
+            await message.delete().catch(() => {});
+
+            const rulesDescription = `
+\`\`          القوانين          \`\`
+* قروبك يكون **متفاعل**
+* قروبك يكون عدده  \`\`4\`\` وفوق
+* شخص مايرسل \`\`5\`\` رسايل يوميا ينطرد .
+* قروبك يقل عن \`\`4\`\` لمده \`\`3\`\` ايام ينحذف .
+* ممنوع نشر القروب بالشات او بالخاص بمقابل .
+* ممنوع التوكنات والحسابات الوهميه وماراح نتساهل بهالامور .
+‏
+\`\`          المسؤول          \`\` 
+\`\`-\`\` المسؤول للي قروبهم 10 وفوق
+\`\`-\`\` المسؤول يتساوى مع الليدر بالرولات او اقل برول
+
+\`\`          المخالفات         \`\`
+\`\`-\`\` \`\`5\`\` مخالفات تحذف رولك وقروبك
+\`\`-\`\` \`\`3\`\` مخالفات تكسر رولك
+
+\`\`          الترقية          \`\`
+\`\`-\`\` اذا قروبك وصل \`\`15000\`\` xp \`\`+\`\` **ترقية** 
+\`\`-\`\` اذا كل الي بقروبك رسلو \`\`25\`\` رسالة يوميا لمده اسبوع
+\`\`+\`\` **ترقية**
+\`\`-\`\` اذا عدد قروبك وصل \`\`10\`\` \`\`+\`\` **ترقية**
+
+\`\`          الرول          \`\`
+\`\`-\`\` بعد ماتشوف قروبك اكتملت شروطة فك <#1535496283115225208>  واطلب **مسؤول يفحصة لو كل شي كويس بيجيك رولك**
+\`\`-\`\` قروبك مخالف 5 مرات ؟ **بينحذف**
+
+**تذكر دايم حقك مايضيع عندنا**
+`.trim();
+
+            const rulesEmbed = new EmbedBuilder()
+                .setTitle('Group Rules ..')
+                .setDescription(rulesDescription)
+                .setColor('#2b2d31');
+
+            return message.channel.send({ embeds: [rulesEmbed] });
+        }
+    }
 
     if (message.content === 'فحص القروبات') {
         if (!hasAllowedRole) return;
