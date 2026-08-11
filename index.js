@@ -317,7 +317,7 @@ client.on('interactionCreate', async (interaction) => {
                     saveDb();
                 }
 
-                return interaction.update({ content: `تم انضمامك بنجاح إلى قروب ${targetGroup.name}`, components: [] }).catch(() => {});
+                return interaction.update({ content: `تم انضمامك للقروب بنجاح!`, components: [] }).catch(() => {});
             } catch (e) {
                 console.error(e);
                 return interaction.reply({ content: 'حدث خطأ أثناء قبول الدعوة', ephemeral: true });
@@ -341,7 +341,6 @@ client.on('interactionCreate', async (interaction) => {
 
     const selectedValue = interaction.values[0];
 
-    // إعادة ضبط القائمة لتصبح بدون علامة صح ثابتة ولكي يستطيع اختيار نفس الخيار مراراً وتكراراً
     const originalRow = interaction.message.components[0];
     if (originalRow) {
         const newSelectMenu = StringSelectMenuBuilder.from(originalRow.components[0]);
@@ -457,7 +456,7 @@ client.on('interactionCreate', async (interaction) => {
                     );
 
                     await targetMember.send({ 
-                        content: `يريد دعوتك الى القروب (${myGroup.name})`, 
+                        content: `<@${member.id}> يريد دعوتك الى القروب (${myGroup.name})`, 
                         components: [rowBtns] 
                     });
                 } catch (e) {
@@ -511,16 +510,19 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_delete_group') {
         try {
+            // حذف روم الشات الكتابي الخاص بالقروب مع التأكد التام من عدم المساس بالروم المحمي
             if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
                 let tChan = guild.channels.cache.get(myGroup.textChannelId);
                 if (tChan) await tChan.delete().catch(() => {});
             }
 
+            // حذف روم الشات الصوتي (الفويس) الخاص بالقروب
             if (myGroup.voiceChannelId) {
                 let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
                 if (vChan) await vChan.delete().catch(() => {});
             }
 
+            // حذف رول القروب نهائياً من السيرفر
             let role = guild.roles.cache.get(myGroup.roleId);
             if (role) await role.delete().catch(() => {});
         } catch (e) {}
