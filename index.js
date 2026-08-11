@@ -22,7 +22,7 @@ const CHANNELS = {
     TOP_GROUPS: "1535491143897325578",
     LEADER_PANEL: "1535491487763136542",
     COLOR_ROOM: "1535406298781192292",
-    COLOR_ROOM_TARGET: "1536594815779864576", // روم الألوان الجديد
+    COLOR_ROOM_TARGET: "1536594815779864576",
     TEXT_CATEGORY: "1536221607645814874",
     VOICE_CATEGORY: "1536221822717141012"
 };
@@ -64,7 +64,6 @@ async function updateTopGroupsBoard() {
         let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 7);
         let description = "";
 
-        // التعديل هنا: اسم القروب بجانب الرقم (1- h) ثم الـ XP في السطر التالي
         sortedGroups.forEach((g, index) => {
             description += `${index + 1}- ${g.name}\nXP ${g.xp || 0}\n\n`;
         });
@@ -97,23 +96,26 @@ client.on('messageCreate', async (message) => {
 
     if (message.content === 'فحص القروبات') {
         if (!hasAllowedRole) return;
-        let groupList = Object.values(db.groups);
+        
+        // ترتيب القروبات من الأعلى XP للأقل
+        let groupList = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0));
         let totalGroupsCount = groupList.length;
-        let requiredWords = 25 + ((totalGroupsCount > 4 ? totalGroupsCount - 4 : 0) * 5);
+        let requiredWords = 25; // ثابته على 25 كما طلبت
 
-        let report = `تقرير وفحص القروبات الشامل\nإجمالي عدد القروبات ${totalGroupsCount}\nالحد الأدنى المطلوب للكلمات اليومية لكل قروب ${requiredWords} كلمة\n-----------------------------------\n`;
+        let report = `تقرير وفحص القروبات الشامل\nعدد القروبات ${totalGroupsCount}\nالعدد المطلوب للكلمات اليوميه\n(${requiredWords})\n-----------------------------------\n`;
 
         groupList.forEach((g, idx) => {
             let membersCount = (g.members ? g.members.length : 0) + 1;
             let wordsToday = g.textCount || 0;
-            let hasWarning = false;
+            let isCommitted = wordsToday >= requiredWords ? "نعم" : "لا";
 
-            if (membersCount < 4 || wordsToday < requiredWords) {
-                hasWarning = true;
+            report += `-${idx + 1} القروب ${g.name}\n`;
+            report += `-${idx + 1} الأعضاء ${membersCount}\n`;
+            report += `-${idx + 1} الكلمات ملتزمين بيوميا 25 رسالة ${isCommitted}`;
+            if (isCommitted === "لا") {
+                report += ` ⚠️⚠️⚠️`;
             }
-
-            let statusIcon = hasWarning ? "تحذير" : "سليم";
-            report += `${idx + 1} القروب ${g.name} الأعضاء ${membersCount} الكلمات ${wordsToday} ${statusIcon}\n`;
+            report += `\n\n`;
         });
 
         return message.channel.send({ content: report });
@@ -148,9 +150,10 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // دعم أمر setup أو setip لتفادي الخطأ الإملائي وتسهيل الإرسال
-    if (message.content === '!setup' || message.content === '!setip') {
-        if (!hasAllowedRole) return;
+    if (message.content === '!setup') {
+        if (!hasAllowedRole || message.channel.id !== CHANNELS.LEADER_PANEL) {
+            return;
+        }
 
         const leaderChannel = message.guild.channels.cache.get(CHANNELS.LEADER_PANEL);
         if (leaderChannel) {
@@ -168,9 +171,6 @@ client.on('messageCreate', async (message) => {
 
             const row = new ActionRowBuilder().addComponents(selectMenu);
             await leaderChannel.send({ components: [row] });
-            if (message.channel.id !== CHANNELS.LEADER_PANEL) {
-                await message.reply({ content: `تم إرسال اللوحة إلى روم <#${CHANNELS.LEADER_PANEL}>` }).catch(()=>{});
-            }
         }
         return;
     }
