@@ -97,10 +97,9 @@ client.on('messageCreate', async (message) => {
     if (message.content === 'فحص القروبات') {
         if (!hasAllowedRole) return;
         
-        // ترتيب القروبات من الأعلى XP للأقل
         let groupList = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0));
         let totalGroupsCount = groupList.length;
-        let requiredWords = 25; // ثابته على 25 كما طلبت
+        let requiredWords = 25;
 
         let report = `تقرير وفحص القروبات الشامل\nعدد القروبات ${totalGroupsCount}\nالعدد المطلوب للكلمات اليوميه\n(${requiredWords})\n-----------------------------------\n`;
 
@@ -155,24 +154,20 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
-        const leaderChannel = message.guild.channels.cache.get(CHANNELS.LEADER_PANEL);
-        if (leaderChannel) {
-            const selectMenu = new StringSelectMenuBuilder()
-                .setCustomId('leader_select_menu')
-                .setPlaceholder('Choose a leader action')
-                .addOptions([
-                    { label: 'Role Color', description: 'تغيير لون رول القروب', value: 'btn_role_color' },
-                    { label: 'Edit Role', description: 'تعديل اسم رول القروب', value: 'btn_edit_role' },
-                    { label: 'Invite Member', description: 'دعوة عضو أو أكثر للقروب', value: 'btn_invite_member' },
-                    { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member' },
-                    { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats' },
-                    { label: 'Leave Group', description: 'الخروج أو حذف القروب', value: 'btn_leave_group' }
-                ]);
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('leader_select_menu')
+            .setPlaceholder('Choose a leader action')
+            .addOptions([
+                { label: 'Role Color', description: 'تغيير لون رول القروب', value: 'btn_role_color' },
+                { label: 'Edit Role', description: 'تعديل اسم رول القروب', value: 'btn_edit_role' },
+                { label: 'Invite Member', description: 'دعوة عضو أو أكثر للقروب', value: 'btn_invite_member' },
+                { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member' },
+                { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats' },
+                { label: 'Leave Group', description: 'الخروج أو حذف القروب', value: 'btn_leave_group' }
+            ]);
 
-            const row = new ActionRowBuilder().addComponents(selectMenu);
-            await leaderChannel.send({ components: [row] });
-        }
-        return;
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        return message.channel.send({ components: [row] });
     }
 
     if (message.content.toLowerCase() === 'crator group') {
