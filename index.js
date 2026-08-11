@@ -68,224 +68,66 @@ async function generateTopBoardImage(sortedGroups) {
     const canvas = createCanvas(1200, 675);
     const ctx = canvas.getContext('2d');
 
-    const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    bgGradient.addColorStop(0, '#0d1b2a');
-    bgGradient.addColorStop(0.5, '#1b263b');
-    bgGradient.addColorStop(1, '#0d1b2a');
-    ctx.fillStyle = bgGradient;
+    // Background
+    ctx.fillStyle = '#0d1b2a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Header Title
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 32px sans-serif';
-    ctx.fillText('groups', 120, 65);
-
-    ctx.fillStyle = '#778da9';
-    ctx.font = '14px sans-serif';
-    ctx.fillText('Performance board / activity • voice • events', 120, 95);
-
-    let totalXpAll = sortedGroups.reduce((acc, g) => acc + (g.xp || 0), 0);
-    let totalGroupsCount = sortedGroups.length;
-
-    function drawStatBox(x, y, w, h, title, val) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(x, y, w, h, 12);
-        else ctx.rect(x, y, w, h);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#778da9';
-        ctx.font = '11px sans-serif';
-        ctx.fillText(title, x + 15, y + 22);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 18px sans-serif';
-        ctx.fillText(val, x + 15, y + 48);
-    }
-
-    drawStatBox(520, 35, 95, 65, 'GROUPS', totalGroupsCount.toString());
-    drawStatBox(625, 35, 115, 65, 'TOTAL XP', totalXpAll.toLocaleString());
-    drawStatBox(750, 35, 105, 65, 'EVENT WINS', '0');
-
-    let dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    drawStatBox(865, 35, 145, 65, 'UPDATED', dateStr);
-
-    ctx.fillStyle = 'rgba(41, 65, 104, 0.25)';
-    ctx.strokeStyle = 'rgba(119, 141, 169, 0.4)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(45, 130, 410, 500, 16);
-    else ctx.rect(45, 130, 410, 500);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('#1', 75, 165);
-
-    ctx.fillStyle = '#778da9';
-    ctx.font = '12px sans-serif';
-    ctx.fillText('CURRENT CHAMPION', 105, 165);
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText('GROUPS LEADERBOARD', 60, 70);
 
     let topGroup = sortedGroups[0];
+
+    // Top 1 Box
+    ctx.fillStyle = '#1b263b';
+    ctx.fillRect(60, 120, 520, 480);
+
+    ctx.fillStyle = '#415a77';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText('👑 #1 CHAMPION GROUP', 90, 170);
+
     if (topGroup) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
-        ctx.closePath();
-        ctx.clip();
-        try {
-            const avatarImg = await loadImage(topGroup.leaderAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png');
-            ctx.drawImage(avatarImg, 80, 215, 90, 90);
-        } catch (e) {
-            ctx.fillStyle = '#333';
-            ctx.fillRect(80, 215, 90, 90);
-        }
-        ctx.restore();
-
-        ctx.strokeStyle = '#778da9';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
-        ctx.stroke();
-
         ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.fillText(topGroup.name || 'GROUP', 90, 250);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '18px sans-serif';
+        ctx.fillText(`Leader: ${topGroup.leaderName || 'USER'}`, 90, 290);
+
+        ctx.fillStyle = '#38bdf8';
         ctx.font = 'bold 28px sans-serif';
-        ctx.fillText(topGroup.name || 'GROUP', 190, 245);
-
-        ctx.fillStyle = '#778da9';
-        ctx.font = '13px sans-serif';
-        ctx.fillText(`LED BY ${topGroup.leaderName || 'USER'}`, 190, 275);
-
-        ctx.fillStyle = 'rgba(13, 27, 42, 0.5)';
-        ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(65, 345, 200, 60, 10);
-            ctx.roundRect(275, 345, 160, 60, 10);
-        } else {
-            ctx.rect(65, 345, 200, 60);
-            ctx.rect(275, 345, 160, 60);
-        }
-        ctx.fill();
-
-        ctx.fillStyle = '#778da9';
-        ctx.font = '10px sans-serif';
-        ctx.fillText('TOTAL EXPERIENCE', 80, 370);
-        ctx.fillText('EVENT WINS', 290, 370);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.fillText((topGroup.xp || 0).toLocaleString(), 80, 395);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 22px sans-serif';
-        ctx.fillText('0', 290, 395);
-
-        ctx.fillStyle = '#1b263b';
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(65, 465, 370, 6, 3);
-        else ctx.rect(65, 465, 370, 6);
-        ctx.fill();
-
-        ctx.fillStyle = '#778da9';
-        ctx.font = '12px sans-serif';
-        ctx.fillText('Leading the board', 65, 510);
-        ctx.fillText('Defend the crown.', 315, 510);
+        ctx.fillText(`XP: ${(topGroup.xp || 0).toLocaleString()}`, 90, 360);
     } else {
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 28px sans-serif';
-        ctx.fillText('NO GROUP', 190, 250);
-
-        ctx.fillStyle = '#778da9';
-        ctx.font = '13px sans-serif';
-        ctx.fillText('LED BY NONE', 190, 280);
+        ctx.fillText('No Groups Yet', 90, 250);
     }
 
-    let cardPositions = [
-        { x: 480, y: 130 },
-        { x: 840, y: 130 },
-        { x: 480, y: 255 },
-        { x: 840, y: 255 },
-        { x: 480, y: 380 },
-        { x: 840, y: 380 }
-    ];
-
+    // List for 2 to 7
+    let startY = 120;
     for (let i = 1; i <= 6; i++) {
         let g = sortedGroups[i];
-        let pos = cardPositions[i - 1];
-        if (!pos) break;
+        let boxY = startY + ((i - 1) * 75);
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(pos.x, pos.y, 335, 105, 12);
-        else ctx.rect(pos.x, pos.y, 335, 105);
-        ctx.fill();
-        ctx.stroke();
+        ctx.fillStyle = '#1b263b';
+        ctx.fillRect(610, boxY, 530, 65);
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText(`#${i + 1}`, pos.x + 20, pos.y + 28);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText(`#${i + 1}`, 635, boxY + 40);
 
         if (g) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
-            ctx.closePath();
-            ctx.clip();
-            try {
-                let av = await loadImage(g.leaderAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png');
-                ctx.drawImage(av, pos.x + 30, pos.y + 45, 40, 40);
-            } catch (e) {
-                ctx.fillStyle = '#333';
-                ctx.fillRect(pos.x + 30, pos.y + 45, 40, 40);
-            }
-            ctx.restore();
+            ctx.fillText(g.name || 'GROUP', 690, boxY + 40);
 
-            ctx.strokeStyle = 'rgba(119, 141, 169, 0.3)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
-            ctx.stroke();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 15px sans-serif';
-            ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 50);
-
-            ctx.fillStyle = '#778da9';
-            ctx.font = '11px sans-serif';
-            ctx.fillText(`Leader • ${g.leaderName || 'USER'}`, pos.x + 85, pos.y + 75);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 15px sans-serif';
+            ctx.fillStyle = '#38bdf8';
             ctx.textAlign = 'right';
-            ctx.fillText(`${(g.xp || 0).toLocaleString()} XP`, pos.x + 315, pos.y + 55);
-
-            ctx.fillStyle = '#778da9';
-            ctx.font = '10px sans-serif';
-            ctx.fillText('0 WINS', pos.x + 315, pos.y + 78);
+            ctx.fillText(`${(g.xp || 0).toLocaleString()} XP`, 1110, boxY + 40);
             ctx.textAlign = 'left';
         } else {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 16px sans-serif';
-            ctx.fillText('---', pos.x + 85, pos.y + 55);
-
-            ctx.fillStyle = '#778da9';
-            ctx.font = '11px sans-serif';
-            ctx.fillText('Leader • ---', pos.x + 85, pos.y + 78);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 15px sans-serif';
-            ctx.textAlign = 'right';
-            ctx.fillText('0 XP', pos.x + 315, pos.y + 55);
-
-            ctx.fillStyle = '#778da9';
-            ctx.font = '10px sans-serif';
-            ctx.fillText('0 WINS', pos.x + 315, pos.y + 78);
-            ctx.textAlign = 'left';
+            ctx.fillStyle = '#64748b';
+            ctx.fillText('---', 690, boxY + 40);
         }
     }
 
@@ -370,8 +212,7 @@ client.on('messageCreate', async (message) => {
             const embed = new EmbedBuilder()
                 .setTitle('Leader Panel')
                 .setDescription('هنا يقدر ليدر القروب يتحكم بقروبه بشكل سريع ومنظم.')
-                .setColor('#2b2d31')
-                .setThumbnail('https://cdn.discordapp.com/attachments/1531644529818472458/1536192486597197824/A2CE557C-489A-468B-826F-8076DE214463.png');
+                .setColor('#2b2d31');
 
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('leader_select_menu')
@@ -392,9 +233,7 @@ client.on('messageCreate', async (message) => {
     }
 
     if (message.content.toLowerCase() === 'crator group') {
-        if (!hasAllowedRole) {
-            return;
-        }
+        if (!hasAllowedRole) return;
 
         const replyMsg = await message.reply({ content: 'منشن الشخص الذي تريده أن يصبح ليدر للجروب:' }).catch(() => null);
 
@@ -456,7 +295,6 @@ client.on('messageCreate', async (message) => {
                         roleId: groupRole.id,
                         leaderId: targetOwner.id,
                         leaderName: targetOwner.user.username,
-                        leaderAvatar: targetOwner.user.displayAvatarURL({ extension: 'png', size: 256 }),
                         members: [],
                         xp: 0,
                         textCount: 0,
