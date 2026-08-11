@@ -41,7 +41,7 @@ const ALLOWED_CREATOR_ID = "1535375782736560128";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
 
-// رابط صورتك التصميمية الثابتة
+// ضع هنا رابط صورة دائم ومباشر (أو اتركه هكذا وسيقوم الكود بتشغيل خلفية بديلة فخمة لو فشل الرابط)
 const BACKGROUND_IMAGE_URL = "https://cdn.discordapp.com/attachments/1536439598866239518/1536551508802404373/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png";
 
 function loadDb() {
@@ -71,20 +71,23 @@ async function generateTopBoardImage(sortedGroups) {
     const canvas = createCanvas(1200, 675);
     const ctx = canvas.getContext('2d');
 
-    // تحميل صورتك التصميمية كخلفية أساسية للوحة
+    // محاولة تحميل الصورة مع حماية تامة (لو انتهى الرابط يرسم خلفية دكنة فخمة تلقائياً)
     try {
         const bgImage = await loadImage(BACKGROUND_IMAGE_URL);
         ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
     } catch (e) {
-        ctx.fillStyle = '#0d1b2a';
+        // خلفية بديلة فخمة جداً في حال فشل الرابط المؤقت
+        ctx.fillStyle = '#0b0f19';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#1e293b';
+        ctx.roundRect ? ctx.roundRect(40, 40, 1120, 595, 20) : ctx.fillRect(40, 40, 1120, 595);
+        ctx.fill();
     }
 
     let topGroup = sortedGroups[0];
 
-    // رسم بيانات المركز الأول (Champion) فوق الصورة
+    // رسم بيانات المركز الأول
     if (topGroup) {
-        // صورة ليدر القروب الدائرية في المركز الأول
         ctx.save();
         ctx.beginPath();
         ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
@@ -99,17 +102,14 @@ async function generateTopBoardImage(sortedGroups) {
         }
         ctx.restore();
 
-        // اسم القروب الحقيقي بدلاً من USER
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 26px sans-serif';
         ctx.fillText(topGroup.name || 'GROUP', 190, 245);
 
-        // اسم الليدر
         ctx.fillStyle = '#778da9';
         ctx.font = '13px sans-serif';
         ctx.fillText(`LED BY ${topGroup.leaderName || 'USER'}`, 190, 275);
 
-        // الأكس بي الحقيقي للقروب الأول
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 24px sans-serif';
         ctx.fillText((topGroup.xp || 0).toLocaleString(), 80, 395);
@@ -125,7 +125,6 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.fillText('0', 80, 395);
     }
 
-    // إحداثيات بطاقات المراكز من 2 إلى 7
     let cardPositions = [
         { x: 480, y: 130 },
         { x: 840, y: 130 },
@@ -141,7 +140,6 @@ async function generateTopBoardImage(sortedGroups) {
         if (!pos) break;
 
         if (g) {
-            // صورة ليدر القروب للمراكز من 2 إلى 7
             ctx.save();
             ctx.beginPath();
             ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
@@ -156,17 +154,14 @@ async function generateTopBoardImage(sortedGroups) {
             }
             ctx.restore();
 
-            // اسم القروب الحقيقي للمركز
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 15px sans-serif';
             ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 50);
 
-            // اسم الليدر
             ctx.fillStyle = '#778da9';
             ctx.font = '11px sans-serif';
             ctx.fillText(`Leader • ${g.leaderName || 'USER'}`, pos.x + 85, pos.y + 75);
 
-            // الأكس بي الحقيقي المتزايد
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 15px sans-serif';
             ctx.textAlign = 'right';
@@ -196,7 +191,6 @@ async function updateTopGroupsBoard() {
             }
         }
 
-        // إرسال الصورة وحدها بشكل نظيف ومباشر
         await channel.send({ files: [attachment] });
     } catch (e) {
         console.error('Error updating top board:', e);
