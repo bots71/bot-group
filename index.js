@@ -36,6 +36,7 @@ const CHANNELS = {
 };
 
 const ALLOWED_CREATOR_ID = "1535375782736560128";
+const COLOR_ROOM_TARGET = "1536594815779864576";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
 
@@ -62,6 +63,22 @@ function getLeaderOrOwnedGroups(member) {
     });
 }
 
+const COLOR_MAP = {
+    "1": "#FFFFFF",
+    "2": "#B39DDB",
+    "3": "#7986CB",
+    "4": "#5C6BC0",
+    "5": "#455A64",
+    "6": "#CE93D8",
+    "7": "#9FA8DA",
+    "8": "#5C6BC0",
+    "9": "#AB47BC",
+    "10": "#78909C",
+    "11": "#BA68C8",
+    "999": "#000000",
+    "1010": "#2B2D31"
+};
+
 async function updateTopGroupsBoard() {
     try {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
@@ -74,13 +91,13 @@ async function updateTopGroupsBoard() {
         if (sortedGroups.length > 0) {
             sortedGroups.forEach((g, index) => {
                 let rank = index + 1;
-                description += `${rank}-\n${g.name}\n${g.xp || 0} Group XP\n\n`;
+                description += `${rank}-\n${g.name}\n${g.xp || 0}\n\n`;
             });
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('GROUPS LEADERBOARD')
             .setDescription(description || ' ')
+            .setImage('https://cdn.discordapp.com/attachments/1536439598866239518/1536551508802404373/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7bd09b&is=6a7a7f1b&hm=71063f8f3ebb33e9af0d22b948f56fd9f405807e325862f7b83edcc45735ce8a&')
             .setColor('#2b2d31');
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
@@ -172,11 +189,6 @@ client.on('messageCreate', async (message) => {
 
         const leaderChannel = message.guild.channels.cache.get(CHANNELS.LEADER_PANEL);
         if (leaderChannel) {
-            const embed = new EmbedBuilder()
-                .setTitle('Leader Panel')
-                .setDescription('هنا يقدر ليدر القروب يتحكم بقروبه بشكل سريع ومنظم')
-                .setColor('#2b2d31');
-
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('leader_select_menu')
                 .setPlaceholder('Choose a leader action')
@@ -190,7 +202,7 @@ client.on('messageCreate', async (message) => {
                 ]);
 
             const row = new ActionRowBuilder().addComponents(selectMenu);
-            await leaderChannel.send({ embeds: [embed], components: [row] });
+            await leaderChannel.send({ components: [row] });
         }
         return;
     }
@@ -277,10 +289,21 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    if (message.channel.id === CHANNELS.COLOR_ROOM) {
+    if (message.channel.id === COLOR_ROOM_TARGET) {
         let userOwned = getLeaderOrOwnedGroups(message.member);
-        if (userOwned.length === 0) {
-            return message.reply({ content: 'هذه الصلاحيات غير مخصصة إلا لليدر', ephemeral: true }).catch(()=>{});
+        if (userOwned.length > 0) {
+            let colorHex = COLOR_MAP[message.content.trim()];
+            if (colorHex) {
+                let myGroup = db.groups[userOwned[0]];
+                let role = message.guild.roles.cache.get(myGroup.roleId);
+                if (role) {
+                    await role.setColor(colorHex).catch(()=>{});
+                    await message.delete().catch(()=>{});
+                    let confirm = await message.channel.send({ content: `تم تغيير لون رول القروب بنجاح` });
+                    setTimeout(() => confirm.delete().catch(()=>{}), 2000);
+                    return;
+                }
+            }
         }
     }
 
@@ -397,37 +420,21 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_role_color') {
-        const promptMsg = await channel.send({ content: `اكتب رقم لون جروبك` });
-        const filter = m => m.author.id === member.id;
-        const collector = channel.createMessageCollector({ filter, time: 20000, max: 1 });
-
-        collector.on('collect', async (m) => {
-            await m.delete().catch(()=>{});
-            await promptMsg.delete().catch(()=>{});
-            let colorNumber = m.content.trim();
-            try {
-                let role = guild.roles.cache.get(myGroup.roleId);
-                if (role) {
-                    let confirm = await channel.send({ content: `تم تغيير لون رول القروب بنجاح` });
-                    setTimeout(() => confirm.delete().catch(()=>{}), 2000);
-                }
-            } catch (err) {}
-        });
+        const replyMsg = await interaction.followUp({ content: `توجه إلى روم الألوان <#${COLOR_ROOM_TARGET}> وأرسل رقم اللون المطلوب`, ephemeral: true });
+        setTimeout(() => replyMsg.delete().catch(() => {}), 6000);
         return;
     }
 
     if (selectedValue === 'btn_edit_role') {
-        const promptMsg = await channel.send({ content: `اكتب اسم رول القروب الجديد عربي أو إنجليزي` });
+        const promptMsg = await interaction.followUp({ content: `اكتب اسم رول القروب الجديد`, ephemeral: true });
         const filter = m => m.author.id === member.id;
         const collector = channel.createMessageCollector({ filter, time: 20000, max: 1 });
 
         collector.on('collect', async (m) => {
             await m.delete().catch(()=>{});
-            await promptMsg.delete().catch(()=>{});
             let newName = m.content.trim();
             try {
                 let role = guild.roles.cache.get(myGroup.roleId);
-
                 if (role) await role.setName(newName);
 
                 myGroup.name = newName;
@@ -442,13 +449,12 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_invite_member') {
-        const promptMsg = await channel.send({ content: `منشن الأشخاص المراد دعوتهم للقروب` });
+        const promptMsg = await interaction.followUp({ content: `منشن الأشخاص المراد دعوتهم للقروب`, ephemeral: true });
         const filter = m => m.author.id === member.id;
         const collector = channel.createMessageCollector({ filter, time: 25000, max: 1 });
 
         collector.on('collect', async (m) => {
             await m.delete().catch(()=>{});
-            await promptMsg.delete().catch(()=>{});
 
             let mentions = m.mentions.members;
             if (mentions.size === 0) {
@@ -485,13 +491,12 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_kick_member') {
-        const promptMsg = await channel.send({ content: `منشن الشخص أو الأشخاص المراد طردهم من القروب` });
+        const promptMsg = await interaction.followUp({ content: `منشن الشخص أو الأشخاص المراد طردهم من القروب`, ephemeral: true });
         const filter = m => m.author.id === member.id;
         const collector = channel.createMessageCollector({ filter, time: 25000, max: 1 });
 
         collector.on('collect', async (m) => {
             await m.delete().catch(()=>{});
-            await promptMsg.delete().catch(()=>{});
 
             let mentions = m.mentions.members;
             if (mentions.size === 0) return;
@@ -526,7 +531,7 @@ client.on('interactionCreate', async (interaction) => {
             delete db.groups[myGroupKey];
             saveDb();
             await updateTopGroupsBoard();
-            const replyMsg = await interaction.followUp({ content: 'تم حذف قروبك بنجاح', ephemeral: true });
+            const replyMsg = await interaction.followUp({ content: 'تم حذف قروبك بالكامل بنجاح', ephemeral: true });
             setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         } else {
             let role = guild.roles.cache.get(myGroup.roleId);
