@@ -10,7 +10,6 @@ const {
     PermissionFlagsBits,
     AttachmentBuilder
 } = require('discord.js');
-const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const http = require('http');
 
@@ -41,6 +40,9 @@ const ALLOWED_CREATOR_ID = "1535375782736560128";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
 
+// رابط صورتك الثابتة التي طلبتها
+const BACKGROUND_IMAGE_URL = "https://cdn.discordapp.com/attachments/1536439598866239518/1536551508802404373/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png";
+
 function loadDb() {
     if (fs.existsSync(DB_FILE)) {
         try { 
@@ -64,76 +66,6 @@ function getLeaderOrOwnedGroups(member) {
     });
 }
 
-async function generateTopBoardImage(sortedGroups) {
-    const canvas = createCanvas(1200, 675);
-    const ctx = canvas.getContext('2d');
-
-    // Background
-    ctx.fillStyle = '#0d1b2a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Header Title
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.fillText('GROUPS LEADERBOARD', 60, 70);
-
-    let topGroup = sortedGroups[0];
-
-    // Top 1 Box
-    ctx.fillStyle = '#1b263b';
-    ctx.fillRect(60, 120, 520, 480);
-
-    ctx.fillStyle = '#415a77';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('👑 #1 CHAMPION GROUP', 90, 170);
-
-    if (topGroup) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px sans-serif';
-        ctx.fillText(topGroup.name || 'GROUP', 90, 250);
-
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '18px sans-serif';
-        ctx.fillText(`Leader: ${topGroup.leaderName || 'USER'}`, 90, 290);
-
-        ctx.fillStyle = '#38bdf8';
-        ctx.font = 'bold 28px sans-serif';
-        ctx.fillText(`XP: ${(topGroup.xp || 0).toLocaleString()}`, 90, 360);
-    } else {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 28px sans-serif';
-        ctx.fillText('No Groups Yet', 90, 250);
-    }
-
-    // List for 2 to 7
-    let startY = 120;
-    for (let i = 1; i <= 6; i++) {
-        let g = sortedGroups[i];
-        let boxY = startY + ((i - 1) * 75);
-
-        ctx.fillStyle = '#1b263b';
-        ctx.fillRect(610, boxY, 530, 65);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 18px sans-serif';
-        ctx.fillText(`#${i + 1}`, 635, boxY + 40);
-
-        if (g) {
-            ctx.fillText(g.name || 'GROUP', 690, boxY + 40);
-
-            ctx.fillStyle = '#38bdf8';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${(g.xp || 0).toLocaleString()} XP`, 1110, boxY + 40);
-            ctx.textAlign = 'left';
-        } else {
-            ctx.fillStyle = '#64748b';
-            ctx.fillText('---', 690, boxY + 40);
-        }
-    }
-
-    return canvas.toBuffer('image/png');
-}
-
 async function updateTopGroupsBoard() {
     try {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
@@ -141,8 +73,27 @@ async function updateTopGroupsBoard() {
 
         let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0));
 
-        const buffer = await generateTopBoardImage(sortedGroups);
-        const attachment = new AttachmentBuilder(buffer, { name: 'top-groups.png' });
+        // بناء قائمة التوب بشكل مرتب ونظيف يظهر صورتك والقروبات بدون أي يوزر افتراضي
+        let description = "### 🔥 لوحة صدارة القروبات النشطة\n\n";
+
+        if (sortedGroups.length === 0) {
+            description += "لا توجد قروبات مسجلة حتى الآن. استخدم `crator group` لإنشاء قروب جديد.";
+        } else {
+            sortedGroups.forEach((g, index) => {
+                let medal = index === 0 ? "👑" : `\`#${index + 1}\``;
+                description += `${medal} **${g.name}**\n`;
+                description += `👤 الليدر: **${g.leaderName}** | ⚡ الاكس بي: **${(g.xp || 0).toLocaleString()} XP**\n`;
+                description += `-----------------------------------\n`;
+            });
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('🏆 GROUPS LEADERBOARD')
+            .setDescription(description)
+            .setColor('#2b2d31')
+            .setImage(BACKGROUND_IMAGE_URL)
+            .setTimestamp()
+            .setFooter({ text: 'يتم تحديث اللوحة تلقائياً كل 30 ثانية' });
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
@@ -152,7 +103,7 @@ async function updateTopGroupsBoard() {
             }
         }
 
-        await channel.send({ files: [attachment] });
+        await channel.send({ embeds: [embed] });
     } catch (e) {
         console.error('Error updating top board:', e);
     }
@@ -303,6 +254,7 @@ client.on('messageCreate', async (message) => {
                         createdAt: Date.now()
                     };
                     saveDb();
+                    await updateTopGroupsBoard();
 
                     await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر <@${targetOwner.id}>!` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
@@ -421,6 +373,7 @@ client.on('interactionCreate', async (interaction) => {
 
         delete db.groups[myGroupKey];
         saveDb();
+        await updateTopGroupsBoard();
         const replyMsg = await interaction.followUp({ content: 'تم حذف قروبك بنجاح.', ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
         return;
