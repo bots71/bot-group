@@ -7,10 +7,8 @@ const {
     EmbedBuilder,
     StringSelectMenuBuilder,
     ChannelType,
-    PermissionFlagsBits,
-    AttachmentBuilder
+    PermissionFlagsBits
 } = require('discord.js');
-const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const http = require('http');
 
@@ -41,6 +39,7 @@ const ALLOWED_CREATOR_ID = "1535375782736560128";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
 
+// صورتك الأساسية التي ستظهر كخلفية رئيسية في الـ Embed
 const BACKGROUND_IMAGE_URL = "https://cdn.discordapp.com/attachments/1536439598866239518/1536551508802404373/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png";
 
 function loadDb() {
@@ -66,93 +65,6 @@ function getLeaderOrOwnedGroups(member) {
     });
 }
 
-async function generateTopBoardImage(sortedGroups) {
-    const canvas = createCanvas(1280, 720);
-    const ctx = canvas.getContext('2d');
-
-    try {
-        const bgImage = await loadImage(BACKGROUND_IMAGE_URL);
-        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-    } catch (e) {
-        ctx.fillStyle = '#0b0f19';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    // إجمالي عدد القروبات في الأعلى
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(sortedGroups.length.toString(), 530, 115);
-
-    // إجمالي الاكس بي في الأعلى
-    let totalXp = sortedGroups.reduce((acc, g) => acc + (g.xp || 0), 0);
-    ctx.fillText(totalXp.toLocaleString(), 650, 115);
-
-    // المركز الأول (#1)
-    let topGroup = sortedGroups[0];
-    if (topGroup) {
-        // اسم القروب مكان USER الكبير
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillText(topGroup.name || 'GROUP', 160, 435);
-
-        // الليدر
-        ctx.font = '14px sans-serif';
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText(`LED BY ${topGroup.leaderName || 'USER'}`, 160, 465);
-
-        // الـ XP الكبير في الأسفل للمركز الأول
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px sans-serif';
-        ctx.fillText((topGroup.xp || 0).toLocaleString(), 60, 630);
-    } else {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillText('NO GROUP', 160, 435);
-        ctx.font = '14px sans-serif';
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText('LED BY NONE', 160, 465);
-        ctx.font = 'bold 32px sans-serif';
-        ctx.fillText('0', 60, 630);
-    }
-
-    // المراكز من #2 إلى #7
-    let cardPositions = [
-        { x: 475, y: 335 }, // #2
-        { x: 885, y: 335 }, // #3
-        { x: 475, y: 460 }, // #4
-        { x: 885, y: 460 }, // #5
-        { x: 475, y: 585 }, // #6
-        { x: 885, y: 585 }  // #7
-    ];
-
-    for (let i = 1; i <= 6; i++) {
-        let g = sortedGroups[i];
-        let pos = cardPositions[i - 1];
-        if (!pos) break;
-
-        if (g) {
-            // اسم القروب الصغير
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px sans-serif';
-            ctx.fillText(g.name || 'GROUP', pos.x, pos.y);
-
-            // الليدر الصغير
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '12px sans-serif';
-            ctx.fillText(`Leader • ${g.leaderName || 'USER'}`, pos.x, pos.y + 22);
-
-            // الاكس بي في الكرت الصغير
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 16px sans-serif';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${(g.xp || 0).toLocaleString()} XP`, pos.x + 310, pos.y + 10);
-            ctx.textAlign = 'left';
-        }
-    }
-
-    return canvas.toBuffer('image/png');
-}
-
 async function updateTopGroupsBoard() {
     try {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
@@ -160,8 +72,26 @@ async function updateTopGroupsBoard() {
 
         let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0));
 
-        const buffer = await generateTopBoardImage(sortedGroups);
-        const attachment = new AttachmentBuilder(buffer, { name: 'top-groups.png' });
+        let description = "### 🔥 لوحة صدارة القروبات النشطة\n\n";
+
+        if (sortedGroups.length === 0) {
+            description += "لا توجد قروبات مسجلة حتى الآن. استخدم `crator group` لإنشاء قروب جديد.";
+        } else {
+            sortedGroups.forEach((g, index) => {
+                let medal = index === 0 ? "👑" : `\`#${index + 1}\``;
+                description += `${medal} اسم القروب: **${g.name}**\n`;
+                description += `👤 الليدر: **${g.leaderName}** | ⚡ الاكس بي: **${(g.xp || 0).toLocaleString()} XP**\n`;
+                description += `-----------------------------------\n`;
+            });
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('🏆 GROUPS LEADERBOARD')
+            .setDescription(description)
+            .setColor('#2b2d31')
+            .setImage(BACKGROUND_IMAGE_URL)
+            .setTimestamp()
+            .setFooter({ text: 'يتم تحديث اللوحة تلقائياً كل 30 ثانية' });
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
@@ -171,7 +101,7 @@ async function updateTopGroupsBoard() {
             }
         }
 
-        await channel.send({ files: [attachment] });
+        await channel.send({ embeds: [embed] });
     } catch (e) {
         console.error('Error updating top board:', e);
     }
