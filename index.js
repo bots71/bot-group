@@ -7,10 +7,8 @@ const {
     EmbedBuilder,
     StringSelectMenuBuilder,
     ChannelType,
-    PermissionFlagsBits,
-    AttachmentBuilder
+    PermissionFlagsBits
 } = require('discord.js');
-const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const http = require('http');
 
@@ -41,7 +39,7 @@ const ALLOWED_CREATOR_ID = "1535375782736560128";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
 
-// ضع هنا رابط صورة دائم ومباشر (أو اتركه هكذا وسيقوم الكود بتشغيل خلفية بديلة فخمة لو فشل الرابط)
+// صورتك الأساسية التي طلبتها
 const BACKGROUND_IMAGE_URL = "https://cdn.discordapp.com/attachments/1536439598866239518/1536551508802404373/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png";
 
 function loadDb() {
@@ -67,112 +65,6 @@ function getLeaderOrOwnedGroups(member) {
     });
 }
 
-async function generateTopBoardImage(sortedGroups) {
-    const canvas = createCanvas(1200, 675);
-    const ctx = canvas.getContext('2d');
-
-    // محاولة تحميل الصورة مع حماية تامة (لو انتهى الرابط يرسم خلفية دكنة فخمة تلقائياً)
-    try {
-        const bgImage = await loadImage(BACKGROUND_IMAGE_URL);
-        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-    } catch (e) {
-        // خلفية بديلة فخمة جداً في حال فشل الرابط المؤقت
-        ctx.fillStyle = '#0b0f19';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#1e293b';
-        ctx.roundRect ? ctx.roundRect(40, 40, 1120, 595, 20) : ctx.fillRect(40, 40, 1120, 595);
-        ctx.fill();
-    }
-
-    let topGroup = sortedGroups[0];
-
-    // رسم بيانات المركز الأول
-    if (topGroup) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(125, 260, 45, 0, Math.PI * 2, true);
-        ctx.closePath();
-        ctx.clip();
-        try {
-            const avatarImg = await loadImage(topGroup.leaderAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png');
-            ctx.drawImage(avatarImg, 80, 215, 90, 90);
-        } catch (e) {
-            ctx.fillStyle = '#333';
-            ctx.fillRect(80, 215, 90, 90);
-        }
-        ctx.restore();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 26px sans-serif';
-        ctx.fillText(topGroup.name || 'GROUP', 190, 245);
-
-        ctx.fillStyle = '#778da9';
-        ctx.font = '13px sans-serif';
-        ctx.fillText(`LED BY ${topGroup.leaderName || 'USER'}`, 190, 275);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.fillText((topGroup.xp || 0).toLocaleString(), 80, 395);
-    } else {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 26px sans-serif';
-        ctx.fillText('NO GROUP', 190, 245);
-        ctx.fillStyle = '#778da9';
-        ctx.font = '13px sans-serif';
-        ctx.fillText('LED BY NONE', 190, 275);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.fillText('0', 80, 395);
-    }
-
-    let cardPositions = [
-        { x: 480, y: 130 },
-        { x: 840, y: 130 },
-        { x: 480, y: 255 },
-        { x: 840, y: 255 },
-        { x: 480, y: 380 },
-        { x: 840, y: 380 }
-    ];
-
-    for (let i = 1; i <= 6; i++) {
-        let g = sortedGroups[i];
-        let pos = cardPositions[i - 1];
-        if (!pos) break;
-
-        if (g) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(pos.x + 50, pos.y + 65, 20, 0, Math.PI * 2, true);
-            ctx.closePath();
-            ctx.clip();
-            try {
-                let av = await loadImage(g.leaderAvatar || 'https://cdn.discordapp.com/embed/avatars/0.png');
-                ctx.drawImage(av, pos.x + 30, pos.y + 45, 40, 40);
-            } catch (e) {
-                ctx.fillStyle = '#333';
-                ctx.fillRect(pos.x + 30, pos.y + 45, 40, 40);
-            }
-            ctx.restore();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 15px sans-serif';
-            ctx.fillText(g.name || 'GROUP', pos.x + 85, pos.y + 50);
-
-            ctx.fillStyle = '#778da9';
-            ctx.font = '11px sans-serif';
-            ctx.fillText(`Leader • ${g.leaderName || 'USER'}`, pos.x + 85, pos.y + 75);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 15px sans-serif';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${(g.xp || 0).toLocaleString()} XP`, pos.x + 315, pos.y + 55);
-            ctx.textAlign = 'left';
-        }
-    }
-
-    return canvas.toBuffer('image/png');
-}
-
 async function updateTopGroupsBoard() {
     try {
         const channel = await client.channels.fetch(CHANNELS.TOP_GROUPS).catch(() => null);
@@ -180,8 +72,27 @@ async function updateTopGroupsBoard() {
 
         let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0));
 
-        const buffer = await generateTopBoardImage(sortedGroups);
-        const attachment = new AttachmentBuilder(buffer, { name: 'top-groups.png' });
+        let description = "### 🔥 لوحة صدارة القروبات النشطة\n\n";
+
+        if (sortedGroups.length === 0) {
+            description += "لا توجد قروبات مسجلة حتى الآن. استخدم `crator group` لإنشاء قروب جديد.";
+        } else {
+            sortedGroups.forEach((g, index) => {
+                let medal = index === 0 ? "👑" : `\`#${index + 1}\``;
+                // تم استبدال "يوزر" باسم القروب الحقيقي وعرض الأكس بي بوضوح تحت كل قروب
+                description += `${medal} اسم القروب: **${g.name}**\n`;
+                description += `👤 الليدر: **${g.leaderName}** | ⚡ الاكس بي: **${(g.xp || 0).toLocaleString()} XP**\n`;
+                description += `-----------------------------------\n`;
+            });
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('🏆 GROUPS LEADERBOARD')
+            .setDescription(description)
+            .setColor('#2b2d31')
+            .setImage(BACKGROUND_IMAGE_URL)
+            .setTimestamp()
+            .setFooter({ text: 'يتم تحديث اللوحة تلقائياً كل 30 ثانية' });
 
         const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
         if (messages) {
@@ -191,7 +102,7 @@ async function updateTopGroupsBoard() {
             }
         }
 
-        await channel.send({ files: [attachment] });
+        await channel.send({ embeds: [embed] });
     } catch (e) {
         console.error('Error updating top board:', e);
     }
@@ -334,7 +245,6 @@ client.on('messageCreate', async (message) => {
                         roleId: groupRole.id,
                         leaderId: targetOwner.id,
                         leaderName: targetOwner.user.username,
-                        leaderAvatar: targetOwner.user.displayAvatarURL({ extension: 'png', size: 256 }),
                         members: [],
                         xp: 0,
                         textCount: 0,
