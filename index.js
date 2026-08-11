@@ -163,7 +163,7 @@ client.on('messageCreate', async (message) => {
                 { label: 'Kick Member', description: 'طرد عضو من القروب', value: 'btn_kick_member' },
                 { label: 'My Stats', description: 'عرض إحصائيات القروب', value: 'btn_my_stats' },
                 { label: 'Leave Group', description: 'الخروج من القروب', value: 'btn_leave_group' },
-                { label: 'Delete Group', description: 'حذف القروب (لليدر فقط)', value: 'btn_delete_group' }
+                { label: 'Delete Group', description: 'حذف القروب', value: 'btn_delete_group' }
             ]);
 
         const row = new ActionRowBuilder().addComponents(selectMenu);
