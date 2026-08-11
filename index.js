@@ -1,13 +1,6 @@
-const { 
-    Client, 
-    GatewayIntentBits, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    EmbedBuilder,
-    StringSelectMenuBuilder,
-    ChannelType,
-    PermissionFlagsBits
+Const { 
+    Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
+    EmbedBuilder, StringSelectMenuBuilder, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
 const fs = require('fs');
 const http = require('http');
@@ -19,10 +12,8 @@ http.createServer((req, res) => {
 
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, 
         GatewayIntentBits.GuildVoiceStates
     ]
 });
@@ -31,12 +22,12 @@ const CHANNELS = {
     TOP_GROUPS: "1535491143897325578",
     LEADER_PANEL: "1535491487763136542",
     COLOR_ROOM: "1535406298781192292",
+    COLOR_ROOM_TARGET: "1536594815779864576", // روم الألوان الجديد
     TEXT_CATEGORY: "1536221607645814874",
     VOICE_CATEGORY: "1536221822717141012"
 };
 
 const ALLOWED_CREATOR_ID = "1535375782736560128";
-const COLOR_ROOM_TARGET = "1536594815779864576";
 const DB_FILE = './groups_db.json';
 let db = { groups: {} };
 
@@ -49,34 +40,20 @@ function loadDb() {
     }
 }
 
-function saveDb() {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4));
-}
+function saveDb() { fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4)); }
 
 function getLeaderOrOwnedGroups(member) {
     if (!member) return [];
     return Object.keys(db.groups).filter(k => {
         let g = db.groups[k];
-        let hasRole = member.roles.cache.has(g.roleId);
-        let isLeader = g.leaderId === member.id;
-        return isLeader || hasRole;
+        return g.leaderId === member.id || member.roles.cache.has(g.roleId);
     });
 }
 
 const COLOR_MAP = {
-    "1": "#FFFFFF",
-    "2": "#B39DDB",
-    "3": "#7986CB",
-    "4": "#5C6BC0",
-    "5": "#455A64",
-    "6": "#CE93D8",
-    "7": "#9FA8DA",
-    "8": "#5C6BC0",
-    "9": "#AB47BC",
-    "10": "#78909C",
-    "11": "#BA68C8",
-    "999": "#000000",
-    "1010": "#2B2D31"
+    "1": "#FFFFFF", "2": "#B39DDB", "3": "#7986CB", "4": "#5C6BC0", "5": "#455A64",
+    "6": "#CE93D8", "7": "#9FA8DA", "8": "#5C6BC0", "9": "#AB47BC", "10": "#78909C",
+    "11": "#BA68C8", "999": "#000000", "1010": "#2B2D31"
 };
 
 async function updateTopGroupsBoard() {
@@ -85,35 +62,25 @@ async function updateTopGroupsBoard() {
         if (!channel) return;
 
         let sortedGroups = Object.values(db.groups).sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 7);
-
         let description = "";
 
-        if (sortedGroups.length > 0) {
-            sortedGroups.forEach((g, index) => {
-                let rank = index + 1;
-                description += `${rank}-\n${g.name}\n${g.xp || 0}\n\n`;
-            });
-        }
+        // التنسيق الجديد: الاسم تحت الشرطة، ثم XP ثم الرقم
+        sortedGroups.forEach((g, index) => {
+            description += `${index + 1}-\n${g.name}\nXP ${g.xp || 0}\n\n`;
+        });
 
         const embed = new EmbedBuilder()
             .setDescription(description || ' ')
             .setImage('https://cdn.discordapp.com/attachments/1536439598866239518/1536551508802404373/9A161D96-ADCF-4787-80D9-73C5DEFABFF6.png?ex=6a7bd09b&is=6a7a7f1b&hm=71063f8f3ebb33e9af0d22b948f56fd9f405807e325862f7b83edcc45735ce8a&')
             .setColor('#2b2d31');
 
-        const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
-        if (messages) {
-            const botMessages = messages.filter(m => m.author.id === client.user.id);
-            for (const [id, msg] of botMessages) {
-                await msg.delete().catch(() => {});
-            }
-        }
-
+        const messages = await channel.messages.fetch({ limit: 10 });
+        await channel.bulkDelete(messages.filter(m => m.author.id === client.user.id));
         await channel.send({ embeds: [embed] });
-    } catch (e) {
-        console.error('Error updating top board', e);
-    }
+    } catch (e) { console.error('Error updating top board', e); }
 }
 
+// ... سأكمل لك بقية الدوال (Create, Setup, Logic) في الرد القادم لضمان الحجم الكامل
 client.once('ready', () => {
     loadDb();
     console.log(`Logged in as ${client.user.tag}`);
@@ -280,7 +247,7 @@ client.on('messageCreate', async (message) => {
                     saveDb();
                     await updateTopGroupsBoard();
 
-                    await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر ${targetOwner.id}` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
+                    await message.channel.send({ content: `تم إنشاء القروب بنجاح لليدر <@${targetOwner.id}>` }).then(m => setTimeout(() => m.delete().catch(()=>{}), 10000));
                 } catch (err) {
                     console.error(err);
                 }
@@ -289,7 +256,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    if (message.channel.id === COLOR_ROOM_TARGET) {
+    if (message.channel.id === CHANNELS.COLOR_ROOM_TARGET) {
         let userOwned = getLeaderOrOwnedGroups(message.member);
         if (userOwned.length > 0) {
             let colorHex = COLOR_MAP[message.content.trim()];
@@ -420,7 +387,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (selectedValue === 'btn_role_color') {
-        const replyMsg = await interaction.followUp({ content: `توجه إلى روم الألوان <#${COLOR_ROOM_TARGET}> وأرسل رقم اللون المطلوب`, ephemeral: true });
+        const replyMsg = await interaction.followUp({ content: `توجه إلى روم الألوان <#${CHANNELS.COLOR_ROOM_TARGET}> وأرسل رقم اللون المطلوب`, ephemeral: true });
         setTimeout(() => replyMsg.delete().catch(() => {}), 6000);
         return;
     }
