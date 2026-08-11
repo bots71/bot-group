@@ -22,6 +22,7 @@ const CHANNELS = {
     TOP_GROUPS: "1535491143897325578",
     LEADER_PANEL: "1535491487763136542",
     SETUP_TARGET: "1536594815779864576",
+    PROTECTED_PANEL_CHANNEL: "1536635180272451655", // الروم المحمي الذي لا يمكن حذفه أبداً
     TEXT_CATEGORY: "1536221607645814874",
     VOICE_CATEGORY: "1536221822717141012"
 };
@@ -129,11 +130,18 @@ client.on('messageCreate', async (message) => {
             let myGroup = leaderGroup.data;
             try {
                 let guild = message.guild;
-                let tChan = guild.channels.cache.get(myGroup.textChannelId);
-                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                
+                // حماية الروم العام وعدم حذفه نهائياً
+                if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
+                    let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                    if (tChan) await tChan.delete().catch(() => {});
+                }
+                if (myGroup.voiceChannelId) {
+                    let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                    if (vChan) await vChan.delete().catch(() => {});
+                }
+                
                 let role = guild.roles.cache.get(myGroup.roleId);
-                if (tChan) await tChan.delete().catch(() => {});
-                if (vChan) await vChan.delete().catch(() => {});
                 if (role) await role.delete().catch(() => {});
             } catch (e) {}
 
@@ -476,11 +484,20 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_delete_group') {
         try {
-            let tChan = guild.channels.cache.get(myGroup.textChannelId);
-            let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+            // حذف روم النص الخاص بالقروب فقط مع التأكد التام من عدم المساس بالروم المحمي
+            if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
+                let tChan = guild.channels.cache.get(myGroup.textChannelId);
+                if (tChan) await tChan.delete().catch(() => {});
+            }
+
+            // حذف روم الفويس الخاص بالقروب
+            if (myGroup.voiceChannelId) {
+                let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
+                if (vChan) await vChan.delete().catch(() => {});
+            }
+
+            // حذف رول القروب نهائياً من السيرفر (مما يزيله تلقائياً عن الليدر وكل الأعضاء)
             let role = guild.roles.cache.get(myGroup.roleId);
-            if (tChan) await tChan.delete().catch(() => {});
-            if (vChan) await vChan.delete().catch(() => {});
             if (role) await role.delete().catch(() => {});
         } catch (e) {}
 
