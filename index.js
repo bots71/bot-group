@@ -1,4 +1,4 @@
-Const { 
+const { 
     Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
     EmbedBuilder, StringSelectMenuBuilder, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
