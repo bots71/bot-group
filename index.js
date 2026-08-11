@@ -91,7 +91,8 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(x, y, w, h, 12);
+        if (ctx.roundRect) ctx.roundRect(x, y, w, h, 12);
+        else ctx.rect(x, y, w, h);
         ctx.fill();
         ctx.stroke();
 
@@ -115,7 +116,8 @@ async function generateTopBoardImage(sortedGroups) {
     ctx.strokeStyle = 'rgba(119, 141, 169, 0.4)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(45, 130, 410, 500, 16);
+    if (ctx.roundRect) ctx.roundRect(45, 130, 410, 500, 16);
+    else ctx.rect(45, 130, 410, 500);
     ctx.fill();
     ctx.stroke();
 
@@ -159,8 +161,13 @@ async function generateTopBoardImage(sortedGroups) {
 
         ctx.fillStyle = 'rgba(13, 27, 42, 0.5)';
         ctx.beginPath();
-        ctx.roundRect(65, 345, 200, 60, 10);
-        ctx.roundRect(275, 345, 160, 60, 10);
+        if (ctx.roundRect) {
+            ctx.roundRect(65, 345, 200, 60, 10);
+            ctx.roundRect(275, 345, 160, 60, 10);
+        } else {
+            ctx.rect(65, 345, 200, 60);
+            ctx.rect(275, 345, 160, 60);
+        }
         ctx.fill();
 
         ctx.fillStyle = '#778da9';
@@ -178,7 +185,8 @@ async function generateTopBoardImage(sortedGroups) {
 
         ctx.fillStyle = '#1b263b';
         ctx.beginPath();
-        ctx.roundRect(65, 465, 370, 6, 3);
+        if (ctx.roundRect) ctx.roundRect(65, 465, 370, 6, 3);
+        else ctx.rect(65, 465, 370, 6);
         ctx.fill();
 
         ctx.fillStyle = '#778da9';
@@ -213,7 +221,8 @@ async function generateTopBoardImage(sortedGroups) {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(pos.x, pos.y, 335, 105, 12);
+        if (ctx.roundRect) ctx.roundRect(pos.x, pos.y, 335, 105, 12);
+        else ctx.rect(pos.x, pos.y, 335, 105);
         ctx.fill();
         ctx.stroke();
 
