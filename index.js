@@ -37,11 +37,13 @@ function loadDb() {
         try { 
             const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
             db.groups = data.groups || data;
-        } catch (e) { db = { groups: {} }; }
+            if (!db.invites) db.invites = {};
+        } catch (e) { db = { groups: {}, invites: {} }; }
     }
+    if (!db.invites) db.invites = {};
 }
 
-function saveDb() { fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups }, null, 4)); }
+function saveDb() { fs.writeFileSync(DB_FILE, JSON.stringify({ groups: db.groups, invites: db.invites }, null, 4)); }
 
 function getLeaderGroupsByMember(member) {
     if (!member) return [];
@@ -92,6 +94,41 @@ client.once('ready', () => {
     setInterval(() => {
         updateTopGroupsBoard();
     }, 30000);
+
+    // نظام التحقق من انتهاء مهلة الدعوات (3 أيام = 72 ساعة)
+    setInterval(async () => {
+        if (!db.invites) return;
+        let now = Date.now();
+        let expiredTime = 3 * 24 * 60 * 60 * 1000; // 72 ساعة
+
+        for (let inviteId in db.invites) {
+            let invData = db.invites[inviteId];
+            if (now - invData.timestamp >= expiredTime && !invData.expiredSent) {
+                invData.expiredSent = true;
+                saveDb();
+                try {
+                    let guild = client.guilds.cache.get(invData.guildId);
+                    if (guild) {
+                        let targetMember = await guild.members.fetch(invData.targetId).catch(() => null);
+                        let leader = await guild.members.fetch(invData.leaderId).catch(() => null);
+                        if (targetMember) {
+                            let targetGroup = db.groups[invData.groupKey];
+                            if (targetGroup) {
+                                const rowBtns = new ActionRowBuilder().addComponents(
+                                    new ButtonBuilder().setCustomId(`accept_invite_${invData.groupKey}`).setLabel('قبول').setStyle(ButtonStyle.Secondary),
+                                    new ButtonBuilder().setCustomId(`decline_invite_${invData.groupKey}`).setLabel('رفض').setStyle(ButtonStyle.Secondary)
+                                );
+                                await targetMember.send({ 
+                                    content: `انتهى الوقت المحدد للقبول أو الرفض. تذكير بدعوة إلى القروب (${targetGroup.name}) بواسطة <@${invData.leaderId}>`, 
+                                    components: [rowBtns] 
+                                }).catch(() => {});
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+    }, 60000);
 });
 
 client.on('messageCreate', async (message) => {
@@ -362,6 +399,15 @@ client.on('interactionCreate', async (interaction) => {
                     saveDb();
                 }
 
+                // إزالة الدعوة من قاعدة البيانات لمنع تكرارها
+                if (db.invites) {
+                    let invKey = Object.keys(db.invites).find(k => db.invites[k].targetId === member.id && db.invites[k].groupKey === groupKey);
+                    if (invKey) {
+                        delete db.invites[invKey];
+                        saveDb();
+                    }
+                }
+
                 return interaction.update({ content: `تم انضمامك للقروب بنجاح!`, components: [] }).catch(() => {});
             } catch (e) {
                 console.error(e);
@@ -370,6 +416,13 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (interaction.customId.startsWith('decline_invite_')) {
+            if (db.invites) {
+                let invKey = Object.keys(db.invites).find(k => db.invites[k].targetId === interaction.user.id);
+                if (invKey) {
+                    delete db.invites[invKey];
+                    saveDb();
+                }
+            }
             return interaction.update({ content: 'تم رفض الدعوة', components: [] }).catch(() => {});
         }
         return;
@@ -448,14 +501,17 @@ client.on('interactionCreate', async (interaction) => {
 
             let newName = m.content.trim();
             try {
+                // تعديل اسم رول القروب
                 let role = guild.roles.cache.get(myGroup.roleId);
                 if (role) await role.setName(newName).catch(() => {});
 
-                if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
+                // تعديل اسم الروم الكتابي للقروب فقط دون المساس بالروم المحدد 1536659884420890724
+                if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL && myGroup.textChannelId !== "1536659884420890724") {
                     let tChan = guild.channels.cache.get(myGroup.textChannelId);
                     if (tChan) await tChan.setName(newName).catch(() => {});
                 }
 
+                // تعديل اسم الروم الصوتي للقروب
                 if (myGroup.voiceChannelId) {
                     let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
                     if (vChan) await vChan.setName(newName).catch(() => {});
@@ -488,9 +544,10 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             for (let [id, targetMember] of mentions) {
+                // التحقق هل الشخص موجود في قروب آخر أو في نفس القروب
                 let targetGroup = getMemberGroupByRole(targetMember);
-                if (targetGroup) {
-                    await interaction.followUp({ content: `هذا العضو داخل جروب ثاني فما يمديك`, ephemeral: true });
+                if (targetGroup || targetMember.roles.cache.has(myGroup.roleId) || (myGroup.members && myGroup.members.includes(targetMember.id))) {
+                    await interaction.followUp({ content: `هذا العضو داخل جروب ثاني أو موجود مسبقاً فما يمديك`, ephemeral: true });
                     continue;
                 }
 
@@ -500,10 +557,24 @@ client.on('interactionCreate', async (interaction) => {
                         new ButtonBuilder().setCustomId(`decline_invite_${myGroupKey}`).setLabel('رفض').setStyle(ButtonStyle.Secondary)
                     );
 
-                    await targetMember.send({ 
+                    let sentMsg = await targetMember.send({ 
                         content: `<@${member.id}> يريد دعوتك الى القروب (${myGroup.name})`, 
                         components: [rowBtns] 
                     });
+
+                    // حفظ بيانات الدعوة لمنع التكرار وضبط وقت 3 أيام
+                    if (!db.invites) db.invites = {};
+                    let inviteId = 'inv_' + Date.now() + '_' + targetMember.id;
+                    db.invites[inviteId] = {
+                        targetId: targetMember.id,
+                        leaderId: member.id,
+                        groupKey: myGroupKey,
+                        guildId: guild.id,
+                        timestamp: Date.now(),
+                        expiredSent: false
+                    };
+                    saveDb();
+
                 } catch (e) {
                     await interaction.followUp({ content: `لا يمكن إرسال رسالة خاصة للعضو`, ephemeral: true });
                 }
@@ -523,7 +594,7 @@ client.on('interactionCreate', async (interaction) => {
 
         collector.on('collect', async (m) => {
             await m.delete().catch(() => {});
-            await channel.permissionOverwrites.delete(member.id).catch(() => {});
+            await channel.permissionNames?.delete ? channel.permissionOverwrites.delete(member.id).catch(() => {}) : channel.permissionOverwrites.delete(member.id).catch(() => {});
 
             let mentions = m.mentions.members;
             if (mentions.size === 0) return;
@@ -555,19 +626,16 @@ client.on('interactionCreate', async (interaction) => {
 
     if (selectedValue === 'btn_delete_group') {
         try {
-            // حذف روم الشات الكتابي الخاص بالقروب مع التأكد التام من عدم المساس بالروم المحمي
-            if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL) {
+            if (myGroup.textChannelId && myGroup.textChannelId !== CHANNELS.PROTECTED_PANEL_CHANNEL && myGroup.textChannelId !== "1536659884420890724") {
                 let tChan = guild.channels.cache.get(myGroup.textChannelId);
                 if (tChan) await tChan.delete().catch(() => {});
             }
 
-            // حذف روم الشات الصوتي (الفويس) الخاص بالقروب
             if (myGroup.voiceChannelId) {
                 let vChan = guild.channels.cache.get(myGroup.voiceChannelId);
                 if (vChan) await vChan.delete().catch(() => {});
             }
 
-            // حذف رول القروب نهائياً من السيرفر
             let role = guild.roles.cache.get(myGroup.roleId);
             if (role) await role.delete().catch(() => {});
         } catch (e) {}
